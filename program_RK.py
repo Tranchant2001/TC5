@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+#%%
 
 """
 Projet n°1 du TC5: Numerical Methods du Master PPF.
@@ -16,13 +17,16 @@ Version with the explicit method of RK3-Heun.
 """
 ### PACKAGES    ###
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
-import math
+import datetime as dt
+from numba import jit
 
 
 ### FONCTIONS   ###
 
+@jit(nopython=True)
 def set_velocity_field(L, N, X, Y):
     
     u = np.cos(4 * np.pi * X) * np.sin(4 * np.pi * Y)
@@ -30,6 +34,8 @@ def set_velocity_field(L, N, X, Y):
     
     return u, v
 
+
+@jit(nopython=True)
 def set_initial_potential(X, Y):
     
     phi = np.where(np.sqrt((X - 0.5)**2 + (Y - 0.5)**2) < 0.3, 1.0, 0.0)
@@ -37,38 +43,50 @@ def set_initial_potential(X, Y):
     return phi
 
 
-
-def update(phi, N, dt):
+def update(phi, N, delta_t):
     """
-    Function to update the simulation at each step    
+    Function to update the simulation at each step.
+    Here follows the RK3-heun method.  
     """
     # Precising the parameters for the program
-    Nx = N
-    Ny = N
-    h = L/N
+    dx = L/N
     
-    phi_x = np.zeros_like(phi)
-    phi_y = np.zeros_like(phi)
-    phi_xx = np.zeros_like(phi)
-    phi_yy = np.zeros_like(phi)
+    def f(phi):
+        """
+        Function f as defined at the beginning of the Section 3 of the handout.
+        Here f = [D*Laplacian -V.gradient]
+        """
+        phi_x = np.zeros_like(phi)
+        phi_y = np.zeros_like(phi)
+        phi_xx = np.zeros_like(phi)
+        phi_yy = np.zeros_like(phi)
 
-    # Calculate first derivatives based on the signs of u and v
-    phi_x = np.where(u <= 0,
-                     (np.roll(phi, -1, axis=0) - phi) / h,
-                     (phi - np.roll(phi, 1, axis=0)) / h)
+        # Calculate first derivatives based on the signs of u and v
+        phi_x = np.where(u <= 0,
+                        (np.roll(phi, -1, axis=0) - phi) / dx,
+                        (phi - np.roll(phi, 1, axis=0)) / dx)
 
-    phi_y = np.where(v <= 0,
-                     (np.roll(phi, -1, axis=1) - phi) / h,
-                     (phi - np.roll(phi, 1, axis=1)) / h)
+        phi_y = np.where(v <= 0,
+                        (np.roll(phi, -1, axis=1) - phi) / dx,
+                        (phi - np.roll(phi, 1, axis=1)) / dx)
 
-    # Calculate second derivatives
-    phi_xx = (np.roll(phi, -1, axis=0) - 2 * phi + np.roll(phi, 1, axis=0)) / h**2
-    phi_yy = (np.roll(phi, -1, axis=1) - 2 * phi + np.roll(phi, 1, axis=1)) / h**2
+        # Calculate second derivatives
+        phi_xx = (np.roll(phi, -1, axis=0) - 2 * phi + np.roll(phi, 1, axis=0)) / dx**2
+        phi_yy = (np.roll(phi, -1, axis=1) - 2 * phi + np.roll(phi, 1, axis=1)) / dx**2
 
-    laplacian_phi = phi_xx + phi_yy
-    phi += dt * (D * laplacian_phi - u * phi_x - v * phi_y)
+        laplacian_phi = phi_xx + phi_yy
+        
+        return D*laplacian_phi - u*phi_x - v*phi_y        
+
+    # Processes the intermediate coefficients of the RK method, as specified at the page 42 of the handout.
+    k1 = f(phi)
+    k2 = f(phi + delta_t*k1/3)
+    k3 = f(phi + delta_t*2*k2/3)
     
-    return phi
+    # Finally processes the phi at next step with the weight sum of defined k1 and k3 defined above.
+    phi_plus_1 = phi + delta_t*k1/4 + 3*delta_t*k3/4 
+    
+    return phi_plus_1
 
 
 def get_metric(phi):
@@ -84,7 +102,7 @@ def get_metric(phi):
     return metric
 
 
-def plot_potential_field(phi, time, metric):
+def plot_potential_field(phi, time, metric, **kwargs):
     """
     Plot the state of the scalar field.
     Specifies in the title the time and the metric
@@ -99,12 +117,15 @@ def plot_potential_field(phi, time, metric):
     ax.set_title(f'Diffusion of Scalar Field \n Time: {time:.2f} s \n Metric: {metric:.5f}')
     ax.imshow(phi, extent=(0, L, 0, L), origin='lower', cmap='viridis')
 
+    if 'saveaspng' in kwargs.keys():
+        plt.savefig(dirpath+"/outputs_program_RK/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
 
-def simulation(N, dt, T, phi):
+
+def simulation(N, delta_t, phi, T_comput:dt.timedelta=dt.timedelta(days=7)):
     """
     Function taking the parameter of the problem as time and space smpling csts N and dt.
-    Takes T the maximum time.
     Takes the initial scalar field phi.
+    Takes T_comput, the maximum reel time you want this simulation to run. Default is set to 7 days.
     Processes frame by frame the deduced field with the scheme used in the above function update(phi, N, dt)
     Plots one frame per 100.
     Returns the time it took to reach metric < 0.05
@@ -114,34 +135,54 @@ def simulation(N, dt, T, phi):
     
     # Set time to zero
     time = 0
-    
-    plot_potential_field(phi, time, metric)
+    plot_potential_field(phi, time, metric, saveaspng="0_phi_field.png")
     
     # Set frame counting to zero
     frame = 0
     
+    start_datetime = dt.datetime.now()
+    step_datetime = dt.datetime.now()
     
-    while metric >= 0.05 and frame < 100000:
+    while metric >= 0.05 and metric < 3 and step_datetime - start_datetime < T_comput:
         
         # Update the simulation
-        phi = update(phi, N, dt)
+        phi = update(phi, N, delta_t)
         
         frame += 1
-        time = frame * dt
+        time = frame * delta_t
         
         metric = get_metric(phi)
         
-        if frame%100 == 0:
+
+        if frame%2 == 0:
             print(frame)
-            plot_potential_field(phi, time, metric)
+            plot_potential_field(phi, time, metric, saveaspng=str(frame)+"_phi_field.png")
             plt.pause(0.001)
             
-        if metric > 3 :
-            
-            print("divergence \n")
-            time = 0
-            break
-        
+
+        step_datetime = dt.datetime.now()
+
+    if metric >= 3 :        
+        print("Warning: The simulation stopped running because a divergence was detected (metric >= 3).")
+        print("\tSimulation duration: "+str(step_datetime - start_datetime))
+        print(f"\tVirtual stop time: {time:.2f} s")        
+        print(f"\tVirtual stop frame: {frame}")
+        print(f"\tMetric: {metric:5f}")
+
+    elif step_datetime - start_datetime >= T_comput:
+        print("Warning: The simulation stopped running because the max duration of simulation ("+str(T_comput)+") was reached.")
+        print("\tSimulation duration: "+str(step_datetime - start_datetime))
+        print(f"\tVirtual stop time: {time:.2f} s")
+        print(f"\tVirtual stop frame: {frame}")
+        print(f"\tMetric: {metric:5f}")
+
+    else:
+        print("Success: The simulation stopped running because the field was homogeneous enough (metric < 0.05).")
+        print("\tSimulation duration: "+str(step_datetime - start_datetime))
+        print(f"\tVirtual stop time: {time:.2f} s")        
+        print(f"\tVirtual stop frame: {frame}")
+        print(f"\tMetric: {metric:5f}")
+
     plot_potential_field(phi, time, metric)
     
     return time
@@ -149,14 +190,22 @@ def simulation(N, dt, T, phi):
 
 ### MAIN   ###
 
+
+#Chemin absolu du fichier .py qu'on execute
+fullpath = os.path.abspath(__file__)
+#Chemin absolu du dossier contenant le .py qu'on execute
+dirpath = os.path.dirname(fullpath)
+
 # Parameters of the problem
 L = 1.0     # Length of the (square shaped) domain (m)
 D = 0.001   # Diffusion coefficient
 
 # Initial Parameters of the simulation
-N = 64    # Number of steps for each space axis
-dt = 0.001   # Time step
-T = 10      # Total time
+N = 128    # Number of steps for each space axis
+delta_t = 0.01   # Time step
+
+# Put here the maximum time you want to spend on the computation.
+max_time_computation = dt.timedelta(hours=1)
 
 # Create mesh grid
 x = np.linspace(0, L, N, endpoint=False)
@@ -170,47 +219,4 @@ u, v = set_velocity_field(L, N, X, Y)
 phi = set_initial_potential(X, Y)
 
 
-result_hist = []
-
-    
-dt_values = [0.001]
-N_values = [300]
-
-for value in dt_values :
-    
-    dt = value
-    
-    result_t = []
-
-    for N in N_values:
-        
-        
-        print(f"N = {N}, dt = {dt}")
-        
-        # Create mesh grid
-        x = np.linspace(0, L, N, endpoint=False)
-        y = np.linspace(0, L, N, endpoint=False)
-        X, Y = np.meshgrid(x, y)
-    
-        u, v = set_velocity_field(L, N, X, Y)
-    
-        phi = set_initial_potential(X, Y)
-        
-        total_time_passed = simulation(N, dt, T, phi)
-    
-        result_t.append(total_time_passed)
-        
-        
-    
-        print(f"Total time passed in the simulation: {total_time_passed:.3f} seconds ")
-        
-        phi = set_initial_potential(X, Y)
-
-    result_hist.append(result_t)
-
-for tests in result_hist:
-    plt.close()
-    plt.plot(N_values, tests)
-    plt.show()
-    print("N = ", N, " t = ", tests)
-
+total_time_passed = simulation(N, delta_t, phi, max_time_computation)
