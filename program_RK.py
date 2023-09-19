@@ -114,14 +114,16 @@ def plot_potential_field(phi, time, metric, **kwargs):
     ax.clear()
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
-    ax.set_title(f'Diffusion of Scalar Field \n Time: {time:.2f} s \n Metric: {metric:.5f}')
+    ax.set_title(f'Diffusion of Scalar Field ($\Delta t=${delta_t}, N={N}) \n Time: {time:.2f} s \n Metric: {metric:.5f}')
     ax.imshow(phi, extent=(0, L, 0, L), origin='lower', cmap='viridis')
 
     if 'saveaspng' in kwargs.keys():
         plt.savefig(dirpath+"/outputs_program_RK/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+    plt.pause(1)
+    plt.close(fig)
 
 
-def simulation(N, delta_t, phi, T_comput:dt.timedelta=dt.timedelta(days=7)):
+def simulation(N, delta_t, phi, T_comput:dt.timedelta=dt.timedelta(days=7), showAndSave=True):
     """
     Function taking the parameter of the problem as time and space smpling csts N and dt.
     Takes the initial scalar field phi.
@@ -154,16 +156,18 @@ def simulation(N, delta_t, phi, T_comput:dt.timedelta=dt.timedelta(days=7)):
         metric = get_metric(phi)
         
 
-        if frame%2 == 0:
+        if frame%100 == 0:
             print(frame)
-            plot_potential_field(phi, time, metric, saveaspng=str(frame)+"_phi_field.png")
-            plt.pause(0.001)
+            if showAndSave:
+                plot_potential_field(phi, time, metric, saveaspng=str(frame)+"_phi_field.png")
+
             
 
         step_datetime = dt.datetime.now()
 
     if metric >= 3 :        
         print("Warning: The simulation stopped running because a divergence was detected (metric >= 3).")
+        print(f"\tParameters: (L, D, N, $\Delta t$)=({L}, {D}, {N}, {delta_t})")
         print("\tSimulation duration: "+str(step_datetime - start_datetime))
         print(f"\tVirtual stop time: {time:.2f} s")        
         print(f"\tVirtual stop frame: {frame}")
@@ -171,6 +175,7 @@ def simulation(N, delta_t, phi, T_comput:dt.timedelta=dt.timedelta(days=7)):
 
     elif step_datetime - start_datetime >= T_comput:
         print("Warning: The simulation stopped running because the max duration of simulation ("+str(T_comput)+") was reached.")
+        print(f"\tParameters: (L, D, N, $\Delta t$)=({L}, {D}, {N}, {delta_t})")
         print("\tSimulation duration: "+str(step_datetime - start_datetime))
         print(f"\tVirtual stop time: {time:.2f} s")
         print(f"\tVirtual stop frame: {frame}")
@@ -178,6 +183,7 @@ def simulation(N, delta_t, phi, T_comput:dt.timedelta=dt.timedelta(days=7)):
 
     else:
         print("Success: The simulation stopped running because the field was homogeneous enough (metric < 0.05).")
+        print(f"\tParameters: (L, D, N, $\Delta t$)=({L}, {D}, {N}, {delta_t})")
         print("\tSimulation duration: "+str(step_datetime - start_datetime))
         print(f"\tVirtual stop time: {time:.2f} s")        
         print(f"\tVirtual stop frame: {frame}")
@@ -201,8 +207,8 @@ L = 1.0     # Length of the (square shaped) domain (m)
 D = 0.001   # Diffusion coefficient
 
 # Initial Parameters of the simulation
-N = 128    # Number of steps for each space axis
-delta_t = 0.01   # Time step
+N = 400    # Number of steps for each space axis
+delta_t = 0.00005   # Time step
 
 # Put here the maximum time you want to spend on the computation.
 max_time_computation = dt.timedelta(hours=1)
@@ -218,5 +224,7 @@ u, v = set_velocity_field(L, N, X, Y)
 # Initial scalar field
 phi = set_initial_potential(X, Y)
 
+# Plot and save frames ?
+show_and_save = False
 
-total_time_passed = simulation(N, delta_t, phi, max_time_computation)
+total_time_passed = simulation(N, delta_t, phi, max_time_computation, show_and_save)
