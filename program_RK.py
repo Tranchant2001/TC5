@@ -137,7 +137,6 @@ def simulation(N, delta_t, phi, T_comput:dt.timedelta=dt.timedelta(days=7), show
     
     # Set time to zero
     time = 0
-    plot_potential_field(phi, time, metric, saveaspng="0_phi_field.png")
     
     # Set frame counting to zero
     frame = 0
@@ -148,9 +147,8 @@ def simulation(N, delta_t, phi, T_comput:dt.timedelta=dt.timedelta(days=7), show
     while metric >= 0.05 and metric < 3 and step_datetime - start_datetime < T_comput:
         
         # Update the simulation
-        phi = update(phi, N, delta_t)
+
         
-        frame += 1
         time = frame * delta_t
         
         metric = get_metric(phi)
@@ -162,8 +160,9 @@ def simulation(N, delta_t, phi, T_comput:dt.timedelta=dt.timedelta(days=7), show
                 plot_potential_field(phi, time, metric, saveaspng=str(frame)+"_phi_field.png")
 
             
-
+        phi = update(phi, N, delta_t)
         step_datetime = dt.datetime.now()
+        frame += 1
 
     if metric >= 3 :        
         print("Warning: The simulation stopped running because a divergence was detected (metric >= 3).")
@@ -188,8 +187,6 @@ def simulation(N, delta_t, phi, T_comput:dt.timedelta=dt.timedelta(days=7), show
         print(f"\tVirtual stop time: {time:.2f} s")        
         print(f"\tVirtual stop frame: {frame}")
         print(f"\tMetric: {metric:5f}")
-
-    plot_potential_field(phi, time, metric)
     
     return time
 
@@ -211,7 +208,7 @@ N = 400    # Number of steps for each space axis
 delta_t = 0.00005   # Time step
 
 # Put here the maximum time you want to spend on the computation.
-max_time_computation = dt.timedelta(hours=1)
+max_time_computation = dt.timedelta(hours=6)
 
 # Create mesh grid
 x = np.linspace(0, L, N, endpoint=False)
