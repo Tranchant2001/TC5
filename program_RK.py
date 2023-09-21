@@ -221,7 +221,8 @@ u, v = set_velocity_field(L, N, X, Y)
 # Initial scalar field
 phi = set_initial_potential(X, Y)
 
-# Plot and save frames ?
-show_and_save = False
+# Display and save parameters
+show_and_save = True
+pictures_save_path = dirpath+'/outputs_program_backwardEuler'
 
 total_time_passed = simulation(N, delta_t, phi, max_time_computation, show_and_save)
