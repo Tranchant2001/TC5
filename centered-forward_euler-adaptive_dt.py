@@ -18,7 +18,13 @@ import matplotlib.pyplot as plt
 L = 1.0     # Length of the (square shaped) domain (m)
 D = 0.001   # Diffusion coeffiscient
 
-
+def create_mesh_grid(N):
+    
+    x = np.linspace(0, L, N, endpoint=False)
+    y = np.linspace(0, L, N, endpoint=False)
+    X, Y = np.meshgrid(x, y)
+    
+    return X, Y
 def set_velocity_field(X, Y):
     
     u = np.cos(4 * np.pi * X) * np.sin(4 * np.pi * Y)
@@ -69,35 +75,64 @@ def get_metric(phi):
     
     return metric
 
-def plot_potential_field(phi, time, metric, ratio):
-    
-    # Create a figure and axis for the animation
-    fig, ax = plt.subplots()
-    
-    # Plot the scalar field
-    ax.clear()
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_title(f'mass ratio: {ratio:.5f} \n Time: {time:.2f} s \n Metric: {metric:.5f}')
-    ax.imshow(phi, extent=(0, L, 0, L), origin='lower', cmap='viridis')
-
 def get_mass(phi, N):
     
     h = L/N
     
     return np.sum(phi) * h**2
 
-def simulation(N, dt, phi):
+def get_new_dt(phi, N, dt):
     
     h = L/N
+    
+    # Calculate the maximum gradient of the potential field
+    max_gradient = np.max(np.abs(np.gradient(phi, h, axis=(0, 1))))
+    
+    # Calculate the Fourier and CFL stability criteria
+    fourier_criterion = D * dt / (h**2) <= 0.25
+    cfl_criterion = (dt/h)**2 + (dt/h)**2 <= 1.0
+    
+    # Calculate a safety factor (you can adjust this as needed)
+    safety_factor = 0.9
+    
+    # Calculate a new time step based on the maximum gradient
+    new_dt = safety_factor * h**2 / (4 * D * max_gradient)
+    
+    # Ensure that the new time step is not too large
+    if new_dt > 2 * dt:
+        new_dt = 2 * dt
+
+    
+    # Ensure that the new time step satisfies the stability criteria
+    if not (fourier_criterion and cfl_criterion):
+        new_dt = min(new_dt, (0.25 * h**2) / D, h / np.sqrt(2))
+    
+        
+    return new_dt
+
+def plot_potential_field(phi, time, metric):
+    
+    # Create a figure and axis for the plot
+    fig, ax = plt.subplots()
+    
+    # Plot the scalar field
+    ax.clear()
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_title(f'Diffusion of a scalar field \n Time: {time:.2f} s \n Metric: {metric:.5f}')
+    
+    # Plot the scalar field with a color scale (colorbar)
+    im = ax.imshow(phi, extent=(0, L, 0, L), origin='lower', cmap='viridis')
+
+    # Add a colorbar
+    cbar = plt.colorbar(im, ax=ax)
+
+def simulation(N, dt, phi):
     
     metric = get_metric(phi)
     
     # Set time to zero
     time = 0
-    
-    initial_mass = get_mass(phi, N)
-    ratio = 1
     
     # Set frame counting to zero
     frame = 0
@@ -105,64 +140,44 @@ def simulation(N, dt, phi):
     
     while metric >= 0.05 and frame < 1000000:
         
-        if frame%1000 == 0:
-            plot_potential_field(phi, time, metric, ratio)
+        if frame%100 == 0:
+            
+            # Update the time step
+            dt = get_new_dt(phi, N, dt)
+            
+            plot_potential_field(phi, time, metric)
             plt.pause(0.001)
         
-        # Calculate the maximum gradient of the potential field
-        max_gradient = np.max(np.abs(np.gradient(phi, h, axis=(0, 1))))
-        
-        # Calculate a safety factor (you can adjust this as needed)
-        safety_factor = 0.1
-        
-        # Calculate the Fourier and CFL stability criteria
-        fourier_criterion = D * dt / (h**2) <= 0.25
-        cfl_criterion = (dt/h) + (dt/h) <= 1.0
-        
-        
-        # Calculate a new time step based on the maximum gradient
-        new_dt = safety_factor * h**2 / (4 * D * max_gradient)
-        
-        # Ensure that the new time step is not too large or too small
-        if new_dt > 2 * dt:
-            new_dt = 2 * dt
-        elif new_dt < 0.1 * dt:
-            new_dt = 0.1 * dt
-        
-        # Ensure that the new time step satisfies the stability criteria
-        if not (fourier_criterion and cfl_criterion):
-            new_dt = min(new_dt, (0.25 * h**2) / D, h / 2)
-        
-        # Update the simulation with the new time step
-        phi = update(phi, N, new_dt)
+        # Update the simulation
+        phi = update(phi, N, dt)
         
         frame += 1
-        time += new_dt
-        dt = new_dt
+        time += dt
         
         metric = get_metric(phi)
-        
-        mass = get_mass(phi, N)
-        
-        ratio = mass/initial_mass
-        
-            
-        if metric > 3 or ratio > 1.2 :
+         
+        if metric > 3  :
             
             print("divergence \n")
             time = 0
             break
         
-    plot_potential_field(phi, time, metric, ratio)
+    plot_potential_field(phi, time, metric)
     
     return time
 
+    
+
+
+
+
+
+###MAIN###
+
+dt_values = [0.0001]
+N_values = [400]
 
 result_hist = []
-
-    
-dt_values = [0.00001]
-N_values = [100, 150, 200, 250, 300, 350]
 
 for value in dt_values :
     
@@ -172,29 +187,22 @@ for value in dt_values :
 
     for N in N_values:
         
-        Fo = D*dt/(2*(L/N)**2)
-        
         print("N = ", N)
         
-        
-        # Create mesh grid
-        x = np.linspace(0, L, N, endpoint=False)
-        y = np.linspace(0, L, N, endpoint=False)
-        X, Y = np.meshgrid(x, y)
+        # Create mesh grid, velocity field and initial potential
+        X, Y = create_mesh_grid(N)
     
         u, v = set_velocity_field(X, Y)
     
         phi = set_initial_potential(X, Y)
         
+        # Start simulation
         total_time_passed = simulation(N, dt, phi)
     
         result_t.append(total_time_passed)
         
-        
-    
         print(f"Total time to reach homogeneity: {total_time_passed:.3f} seconds ")
         
-        phi = set_initial_potential(X, Y)
 
     result_hist.append(result_t)
 
