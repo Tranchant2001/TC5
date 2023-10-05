@@ -13,7 +13,7 @@ v1.1
 
 DESCRIPTION:
 Version with the explicit method of RK3-Heun.
-
+Version of the code boosted with Numba.
 """
 ### PACKAGES    ###
 
@@ -40,6 +40,18 @@ def set_initial_potential(X, Y):
     
     return phi
   
+
+def derivative_x(phi):
+    dx = L/N
+    dphidx = np.zeros((N,N),  dtype=float)
+    
+    for i in range(N):
+        for j in range(N):
+            if u[i][j] >= 0:
+                dphidx[i][j] = (phi[i][(j+1)%N] - phi[i][j])/dx
+            else:
+                dphidx[i][j] = (phi[i][j] - phi[i][(j-1)%N])/dx
+nii
 
 def update(phi, N, delta_t):
     """

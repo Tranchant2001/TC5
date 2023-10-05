@@ -72,7 +72,4 @@ plt.ylabel('N')
 plt.legend()
 
 # Show the plot
-plt.show()    
-
-
-
+plt.show()

@@ -94,30 +94,30 @@ def assemble_linear_system(phi):
             Vy_term = v[i, j] / (2 * dy)
     
             # Diagonal (self) entry
-            A[idx, idx] = 1 + dt * (Dx_term + Dy_term)
+            A[idx, idx] = 1 + delta_t * (Dx_term + Dy_term)
             
             
             # Treat x-rotation
             
             if j<(N-1):
                 
-                A[idx ,idx + 1] =  - dt * (Dx_term - Vx_term)   # i + 1
+                A[idx ,idx + 1] =  - delta_t * (Dx_term - Vx_term)   # i + 1
                 
             else :
  
-                A[idx ,idx - j] =  - dt * (Dx_term - Vx_term)   
+                A[idx ,idx - j] =  - delta_t * (Dx_term - Vx_term)   
             
             if j>0:
                 
-                A[idx ,idx - 1] = - dt * (Dx_term + Vx_term)    # i - 1
+                A[idx ,idx - 1] = - delta_t * (Dx_term + Vx_term)    # i - 1
                 
             else :
 
-                A[idx, idx + (N-1)] = - dt * (Dx_term + Vx_term)
+                A[idx, idx + (N-1)] = - delta_t * (Dx_term + Vx_term)
             
             # Treat y-rotation
-            A[idx, (idx + N)%(N*N)] = - dt * (Dy_term + Vy_term)    # j + 1
-            A[idx, (idx + (N*N - N))%(N*N)] = - dt * (Dy_term - Vy_term) # j - 1
+            A[idx, (idx + N)%(N*N)] = - delta_t * (Dy_term + Vy_term)    # j + 1
+            A[idx, (idx + (N*N - N))%(N*N)] = - delta_t * (Dy_term - Vy_term) # j - 1
          
         
             # Set the right-hand side vector
@@ -126,14 +126,12 @@ def assemble_linear_system(phi):
     return A, b
 
 
-def simulation(N, dt, phi, T_comput:dt.timedelta=dt.timedelta(days=7), showAndSave=True):
+def simulation(N, delta_t, phi, T_comput:dt.timedelta=dt.timedelta(days=7), showAndSave=True):
     
     metric = get_metric(phi)
     
     # Set time to zero
     time = 0
-    
-    plot_potential_field(phi, time, metric)
     
     # Set frame counting to zero
     frame = 0
@@ -141,11 +139,11 @@ def simulation(N, dt, phi, T_comput:dt.timedelta=dt.timedelta(days=7), showAndSa
     start_datetime = dt.datetime.now()
     step_datetime = dt.datetime.now()    
     
-    while metric >= 0.05 and (metric > 3 or np.mean(phi) > 1) and step_datetime - start_datetime < T_comput:
+    while metric >= 0.05 and (metric < 3 or np.mean(phi) < 1) and step_datetime - start_datetime < T_comput:
         
-        time = frame * dt
+        time = frame * delta_t
         
-        metric = get_metric(phi)
+
         
         if frame%50 == 0:
             print(frame)
@@ -164,6 +162,7 @@ def simulation(N, dt, phi, T_comput:dt.timedelta=dt.timedelta(days=7), showAndSa
         phi = phin.reshape((Nx, Ny))
 
         step_datetime = dt.datetime.now()
+        metric = get_metric(phi)
         frame += 1
         
     if metric >= 3 or np.mean(phi) > 1:        
@@ -208,7 +207,7 @@ D = 0.001   # Diffusion coeffiscient
 Lx = L
 Ly = L
 N = 60   # Number of steps for each space axis
-dt = 0.001   # Time step
+delta_t = 0.001   # Time step
 Nx = N
 Ny = N
 dx = Lx / Nx # Spatial step size in the x-direction
@@ -232,6 +231,6 @@ u, v = set_velocity_field(L, N, X, Y)
 # Initial scalar field
 phi = set_initial_potential(X, Y)
 
-result = simulation(N, dt, phi, max_time_computation, show_and_save)
+result = simulation(N, delta_t, phi, max_time_computation, show_and_save)
 print(f"Total time passed in the simulation: {result:.3f} seconds ")
 
