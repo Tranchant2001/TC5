@@ -98,8 +98,8 @@ def boundary_conditions(v, u_new, v_new):
     u_new[N-1,:] = np.zeros(N, dtype=float)
 
     # outlet condition
-    u_new[:,N-1] = u[:,N-2]
-    v_new[:,N-1] = v[:,N-2]
+    u_new[:,N-1] = u_new[:,N-2]
+    v_new[:,N-1] = v_new[:,N-2]
 
     # inlet conditions for v
     for jj in range(N):
@@ -115,13 +115,16 @@ def boundary_conditions(v, u_new, v_new):
             v_new[0][jj] = 0.
             v_new[N-1][jj] = 0.
     
-    # slippin wall condition on v
-
+    # slipping wall condition on v
     for ii in range(1,N-1):
         if v[ii,0] > 0:
             v_new[ii][0] = -v[ii][0]*(v[ii][0] - v[ii-1][0])/dx + D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
+        if v[ii,0] < 0:
+            v_new[ii][0] = -v[ii][0]*(v[ii+1][0] - v[ii][0])/dx + D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
+        else:
+            v_new[ii][0] = D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
 
-    return u, v
+    return u_new, v_new
 
 
 def update(u, v):
@@ -280,9 +283,8 @@ L_coflow = 5e-4 # length of the inlet coflow.
 # Initial Parameters of the simulation
 N = 128    # Number of steps for each space axis
 dx = L/N
-max_u = 1 # because the max inlet velocity is 1 m/s.
+max_u = 1. # because the max inlet velocity is 1 m/s.
 delta_t = 0.90*min((dx)**2/D, dx/max_u)   # Time step
-T = 10      # Total time
 divergence_threshold = 1000
 
 # Create mesh grid
