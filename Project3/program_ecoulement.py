@@ -115,14 +115,24 @@ def boundary_conditions(v, u_new, v_new):
             v_new[0][jj] = 0.
             v_new[N-1][jj] = 0.
     
+
+    # slipping wall simple
+    v_new[:,0] = v_new[:,1]
+
     # slipping wall condition on v
     for ii in range(1,N-1):
         if v[ii,0] > 0:
-            v_new[ii][0] = -v[ii][0]*(v[ii][0] - v[ii-1][0])/dx + D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
-        if v[ii,0] < 0:
-            v_new[ii][0] = -v[ii][0]*(v[ii+1][0] - v[ii][0])/dx + D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
+            #v_new[ii][0] = v[ii][0] + delta_t*D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
+            v_new[ii][0] = v[ii][0] - delta_t*v[ii][0]*(v[ii][0] - v[ii-1][0])/dx + delta_t*D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
+            #v_new[ii][0] = v[ii][0] - delta_t*v[ii][0]*(v[ii][0] - v[ii-1][0])/dx
+
+        elif v[ii,0] < 0:
+            #v_new[ii][0] = v[ii][0] + delta_t*D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
+            v_new[ii][0] = v[ii][0] - delta_t*v[ii][0]*(v[ii+1][0] - v[ii][0])/dx + delta_t*D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
+            #v_new[ii][0] = v[ii][0] - delta_t*v[ii][0]*(v[ii+1][0] - v[ii][0])/dx
         else:
-            v_new[ii][0] = D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
+            v_new[ii][0] = delta_t*D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
+            #v_new[ii][0] = D*(v[ii+1][0] - v[ii][0] + v[ii-1][0] + v[ii][2] -2*v[ii][1])/(dx**2)
 
     return u_new, v_new
 
@@ -149,67 +159,15 @@ def update(u, v):
     laplacian_v = v_xx + v_yy
 
     u_new = u + delta_t*(D*laplacian_u - u*u_x - v*u_y)
-    v_new = v + delta_t*(D*laplacian_v - u*v_x - v*v_y)
+    #u_new = u + delta_t*(D*laplacian_u)
+    #u_new = u + delta_t*(-u*u_x - v*u_y)
 
+    v_new = v + delta_t*(D*laplacian_v - u*v_x - v*v_y)
+    #v_new = v + delta_t*(D*laplacian_v)
+    #v_new = v + delta_t*(-u*v_x - v*v_y)
     u_new, v_new = boundary_conditions(v, u_new, v_new)
 
     return u_new, v_new
-
-
-def plot_potential_field(phi, time, metric, **kwargs):
-    
-    # Create a figure and axis for the animation
-    fig, ax = plt.subplots()
-    
-    # Plot the scalar field
-    ax.clear()
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_title(f'Diffusion of Scalar Field \n Time: {time:.2f} s \n Metric: {metric:.5f}')
-    ax.imshow(phi, extent=(0, L, 0, L), origin='lower', cmap='viridis')
-
-    if 'saveaspng' in kwargs.keys():
-        plt.savefig(dirpath+"/outputs_program_RK/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
-    plt.pause(1)
-    plt.close(fig)
-
-
-def plot_vector_field(x_field, y_field, time, metric, **kwargs):
-
-    # Create a figure and axis for the animation
-    fig = plt.figure() 
-    
-    # Plot the scalar field
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.title(f'Vector Field \n Time: {time:.2f} s \n Metric: {metric:.5f}')
-    plt.quiver(X, Y, x_field, y_field)
-    if 'saveaspng' in kwargs.keys():
-        plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
-    plt.show()
-    plt.pause(1)
-    plt.close(fig)
-
-
-def plot_scalar_field(s_field, time, metric, **kwargs):
-    """
-    Plot the state of the scalar field.
-    Specifies in the title the time and the metric
-    """    
-    # Create a figure and axis for the animation
-    fig, ax = plt.subplots()
-    
-    # Plot the scalar field
-    ax.clear()
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_title(f'Scalar Field ($\Delta t=${delta_t}, N={N}) \n Time: {time:.2f} s \n Metric: {metric:.5f}')
-    image = ax.imshow(s_field, extent=(0, L, 0, L), origin='lower', cmap='viridis')
-    fig.colorbar(image, ax=ax)
-    if 'saveaspng' in kwargs.keys():
-        plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
-    plt.pause(1)
-    plt.close(fig)
 
 
 def simulation(u, v, T_comput:dt.timedelta=dt.timedelta(days=7), showAndSave=True):
@@ -226,6 +184,12 @@ def simulation(u, v, T_comput:dt.timedelta=dt.timedelta(days=7), showAndSave=Tru
     start_datetime = dt.datetime.now()
     step_datetime = dt.datetime.now()
 
+    if showAndSave:
+        fig1, ax1 = plt.subplots()
+        # Plot the scalar field
+        ax1.set_xlabel('X')
+        ax1.set_ylabel('Y')
+
     while vel_metric >= 0.05 and vel_metric < divergence_threshold and step_datetime - start_datetime < T_comput:
         
         time = frame * delta_t
@@ -233,11 +197,16 @@ def simulation(u, v, T_comput:dt.timedelta=dt.timedelta(days=7), showAndSave=Tru
         norm_arr, vel_metric = get_vector_metric(u, v)
         
 
-        if frame%1 == 0:
+        if frame%10 == 0:
             print(frame)
             if showAndSave:
-                plot_scalar_field(norm_arr, time, vel_metric, saveaspng=str(frame)+"_velocity_field.png")
 
+                #plot_scalar_field(norm_arr, frame, time, vel_metric, saveaspng=str(frame)+"_vnorm_field.png")
+                #plot_vector_field(u, v, X, Y, frame, time, vel_metric, saveaspng=str(frame)+"_velocity_field.png")
+                ax1.clear()
+                ax1.set_title(f'Vector Field k={frame}\n Time: {time:.3f} s \n Metric: {vel_metric:.5f}')
+                image = ax1.imshow(norm_arr, extent=(0, L, 0, L), origin='lower', cmap='viridis')
+                fig1.colorbar(image, ax=ax1)
         u, v = update(u, v)
         step_datetime = dt.datetime.now()
         frame += 1
@@ -246,7 +215,7 @@ def simulation(u, v, T_comput:dt.timedelta=dt.timedelta(days=7), showAndSave=Tru
         print(f"Warning: The simulation stopped running because a divergence was detected (vel_metric >= {divergence_threshold}).")
         print(f"\tParameters: (L, D, N, $\Delta t$)=({L}, {D}, {N}, {delta_t})")
         print("\tSimulation duration: "+str(step_datetime - start_datetime))
-        print(f"\tVirtual stop time: {time:.2f} s")        
+        print(f"\tVirtual stop time: {time:.2f} s")   
         print(f"\tVirtual stop frame: {frame}")
         print(f"\tVelocity norm: {vel_metric:5f}")
 
@@ -267,6 +236,46 @@ def simulation(u, v, T_comput:dt.timedelta=dt.timedelta(days=7), showAndSave=Tru
         print(f"\tVelocity norm: {vel_metric:5f}")
 
 
+def plot_vector_field(u_field, v_field, x_field, y_field, frame, time, metric, **kwargs):
+
+    # Create a figure and axis for the animation
+    fig, ax = plt.subplots() 
+    
+    # Plot the scalar field
+    ax.clear()
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_title(f'Vector Field k={frame}\n Time: {time:.3f} s \n Metric: {metric:.5f}')
+    ax.quiver(x_field, y_field, u_field, v_field, scale=5)
+    if 'saveaspng' in kwargs.keys():
+        plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+    plt.pause(1)
+    plt.close(fig)
+
+
+def plot_scalar_field(s_field, frame, time, metric, **kwargs):
+    """
+    Plot the state of the scalar field.
+    Specifies in the title the time and the metric
+    """    
+    # Create a figure and axis for the animation
+    fig, ax = plt.subplots()
+    
+    # Plot the scalar field
+    ax.clear()
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_title(f'Scalar Field k={frame} ($\Delta t=${delta_t}, N={N}) \n Time: {time:.3f} s \n Metric: {metric:.5f}')
+    image = ax.imshow(s_field, extent=(0, L, 0, L), origin='lower', cmap='viridis')
+    fig.colorbar(image, ax=ax)
+    if 'saveaspng' in kwargs.keys():
+        plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+    plt.pause(1)
+    plt.close(fig)
+
+
+
+
 ### MAIN    ###
 
 #Chemin absolu du fichier .py qu'on execute
@@ -276,15 +285,19 @@ dirpath = os.path.dirname(fullpath)
 
 # Parameters of the problem
 L = 2e-3     # Length in the square shape domain.
-D = 15e-6   # Diffusion coeffiscient
+D = 15e-6   # Diffusion coefficient
 L_slot = 5e-4 # length of the inlet slot.
 L_coflow = 5e-4 # length of the inlet coflow.
 
 # Initial Parameters of the simulation
-N = 128    # Number of steps for each space axis
+N = 64    # Number of steps for each space axis
 dx = L/N
 max_u = 1. # because the max inlet velocity is 1 m/s.
-delta_t = 0.90*min((dx)**2/D, dx/max_u)   # Time step
+
+# Choice of dt function of limits
+Fo = 0.25 # Fourier threshold in 2D
+CFL = 0.5 # CFL limit thresholf in 2D
+delta_t = 0.5*min(Fo*dx**2/D, CFL*dx/max_u)   # Time step
 divergence_threshold = 1000
 
 # Create mesh grid
