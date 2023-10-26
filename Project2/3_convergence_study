@@ -1,0 +1,219 @@
+# -*- coding: utf-8 -*-
+#%%
+
+"""
+Projet n°2 du TC5: Numerical Methods du Master PPF.
+Travail en binôme:
+    Jules Chaveyriat
+    Martin Guillon
+
+Créé le 26/10/2023.
+Mis à jour le 26/10/2023.
+v1.1
+
+DESCRIPTION:
+Script realizing a convergence study of different elliptic solver.
+
+"""
+### PACKAGES    ###
+
+import os
+import math
+import numpy as np
+import matplotlib.pyplot as plt
+import datetime as dt
+from numba import njit
+import pandas as pd
+
+
+### FONCTIONS   ###
+
+def initialization_Uz(x, y):
+
+    return (x - L)*x*(y - L)*y  
+
+
+def update_jacobi(u, b):
+    
+    return 0.25*(np.roll(u, -1, axis=0) + np.roll(u, 1, axis=0) + np.roll(u, -1, axis=1) + np.roll(u, 1, axis=1) - b)  
+
+
+@njit
+def update_gauss_siedel(u, b, N):
+
+    uk1 = np.zeros((N, N), dtype=float)
+
+    for i in range(1,N-1):
+        for j in range(1, N-1):
+            uk1[i][j] = 0.25*(uk1[i-1][j] +uk1[i][j-1] + u[i+1][j] + u[i][j+1] - b[i][j])
+
+    return uk1
+
+
+@njit
+def update_SOR(u, b, w, N):
+
+    uk1 = np.zeros((N, N), dtype=float)
+
+    for i in range(1,N-1):
+        for j in range(1, N-1):
+            uk1[i][j] = (1 - w)*u[i][j] +  w*0.25*(uk1[i-1][j] +uk1[i][j-1] + u[i+1][j] + u[i][j+1] - b[i][j])
+
+    return uk1
+
+
+@njit
+def boundary_cond(U_field, N):
+    Uf = np.zeros((N,N), dtype=float)
+    Uf[1:-1,1:-1] = U_field[1:-1,1:-1]
+    return Uf
+
+
+def convergence_error(un, un1, N):
+
+    minus_arr = un1 - un
+    error = np.sum(np.absolute(minus_arr))/N**2
+    return error
+
+
+### MAIN   ###
+
+#Chemin absolu du fichier .py qu'on execute
+fullpath = os.path.abspath(__file__)
+#Chemin absolu du dossier contenant le .py qu'on execute
+dirpath = os.path.dirname(fullpath)
+
+# Parameters of the problem
+L = 1.0     # Length of the (square shaped) domain (m)
+
+# Initial Parameters of the simulation
+#N_list = np.array([4,5,6,7,8,12,16,24,32,64,128,256,512]) # Number of steps for each space axis
+N_list = np.array([20, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200])
+len_Nl = N_list.shape[0]
+
+# Useful constants
+dpdz = 1000
+mu = 1e-3
+beta = dpdz/mu
+piL_p2 = (np.pi/L)**2 #pi over L squared
+
+# Norm threshold
+norm_th = 1e-3
+
+
+results_df = pd.DataFrame(index=list(range(len_Nl)), columns=["N", "JACOBI_frames", "JACOBI_t-comput", "GAUSS-SIEDEL_frames", "GAUSS-SIEDEL_t-comput", "SOR_frames", "SOR_t-comput"])
+
+for k in range(len_Nl):
+
+    N = N_list[k]
+    print(f"Current mesh shape:\t{N}x{N}")
+    # Space step is then:
+    dx = L/N
+
+    # omega parameter evaluation of the SOR method
+    omega = 2*(1 - math.pi/N - (math.pi/N)**2)
+
+    # Create mesh grid
+    x = np.linspace(0, L, N, endpoint=True)
+    y = np.linspace(0, L, N, endpoint=True)
+    X, Y = np.meshgrid(x, y)
+
+    # beta in a horizontal vector
+    beta_arr = np.full((N,N), beta)
+
+    Ushape = (N, N)
+
+    results_df.at[k, "N"] = N
+    ### JACOBI BLOCK ###
+    # Initial Uz field
+    U = initialization_Uz(X, Y)
+    
+    eps = 1.
+    kiter = 1
+    start_datetime = dt.datetime.now()
+    while eps > norm_th:
+
+        Up1 = update_jacobi(U, beta_arr)
+        Up1 = boundary_cond(Up1, N)
+        eps = convergence_error(U, Up1, N)
+        U = Up1
+        kiter += 1
+
+    stop_datetime = dt.datetime.now()
+
+    results_df.at[k, "JACOBI_frames"] = kiter
+    results_df.at[k, "JACOBI_t-comput"] = (stop_datetime - start_datetime).total_seconds()
+
+
+    ### GAUSS-SIEDEL BLOCK ###
+    # Initial Uz field
+    U = initialization_Uz(X, Y)
+    
+    eps = 1.
+    kiter = 1
+    start_datetime = dt.datetime.now()
+    while eps > norm_th:
+
+        Up1 = update_gauss_siedel(U, beta_arr, N)
+        eps = convergence_error(U, Up1, N)
+        U = Up1
+        kiter += 1
+
+    stop_datetime = dt.datetime.now()
+
+    results_df.at[k, "GAUSS-SIEDEL_frames"] = kiter
+    results_df.at[k, "GAUSS-SIEDEL_t-comput"] = (stop_datetime - start_datetime).total_seconds()    
+
+
+    ### SOR BLOCK ###
+    # Initial Uz field
+    U = initialization_Uz(X, Y)
+    
+    eps = 1.
+    kiter = 1
+    start_datetime = dt.datetime.now()
+    while eps > norm_th:
+
+        Up1 = update_SOR(U, beta_arr, omega, N)
+        eps = convergence_error(U, Up1, N)
+        #U_crop = np.delete(np.delete(np.reshape(vecUp1, Ushape), [0], 0), [0], 1)
+        U = Up1
+        kiter += 1
+
+    stop_datetime = dt.datetime.now()
+
+    results_df.at[k, "SOR_frames"] = kiter
+    results_df.at[k, "SOR_t-comput"] = (stop_datetime - start_datetime).total_seconds()
+
+
+results_df = results_df.astype({"N":"int32", "JACOBI_frames":"int32", "GAUSS-SIEDEL_frames":"int32", "SOR_frames":"int32"})
+
+#Delete first line which got biased computation time because of compilation
+results_df = results_df.drop(index=[0])
+results_df = results_df.reset_index(drop=True)
+print(results_df)
+
+results_df.to_csv(dirpath+"/results_comparison/results.csv", sep="\t", decimal=".")
+
+fig1 = plt.figure()
+plt.plot(results_df["N"], results_df["JACOBI_t-comput"], label="JACOBI")
+plt.plot(results_df["N"], results_df["GAUSS-SIEDEL_t-comput"], label="GAUSS-SIEDEL")
+plt.plot(results_df["N"], results_df["SOR_t-comput"], label="SOR")
+plt.xlabel("Mesh parameter N")
+plt.ylabel("Time of computation (s)")
+plt.legend()
+plt.savefig(dirpath+"/results_comparison/t-comput_N.png", dpi=128, bbox_inches="tight")
+plt.show()
+
+
+fig2 = plt.figure()
+plt.loglog(results_df["N"], results_df["JACOBI_t-comput"], label="JACOBI")
+plt.loglog(results_df["N"], results_df["GAUSS-SIEDEL_t-comput"], label="GAUSS-SIEDEL")
+plt.loglog(results_df["N"], results_df["SOR_t-comput"], label="SOR")
+plt.xlabel("Mesh parameter N")
+plt.ylabel("Time of computation (s)")
+plt.legend()
+plt.savefig(dirpath+"/results_comparison/loglog_t-comput_N.png", dpi=128, bbox_inches="tight")
+plt.show()
+
+    
