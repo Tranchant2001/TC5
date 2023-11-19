@@ -1,0 +1,55 @@
+Test de performance du programme_ecoulement.py. Max frame = 2001. N=68. Temps: 4'15''.
+        Parameters: (L, D, N, $\Delta t$)=(0.002, 1.5e-05, 68, 3.125e-06)
+        Simulation duration: 0:04:14.598371
+        Virtual stop time: 0.00625 s
+        Virtual stop frame: 2001
+        Velocity consecutive difference: 6.80e-05
+
+Test de performance du programme_ecoulement.py. Max frame = 2001. N=36. Temps: 51".
+        Parameters: (L, D, N, $\Delta t$)=(0.002, 1.5e-05, 36, 6.25e-06)
+        Simulation duration: 0:00:51.160279
+        Virtual stop time: 0.0125 s
+        Virtual stop frame: 2001
+        Velocity consecutive difference: 4.82e-05
+
+Test de performance du programme_ecoulement.py. Max frame = 6001. N=36. Temps: 2'22".
+        Parameters: (L, D, N, $\Delta t$)=(0.002, 1.5e-05, 36, 6.25e-06)
+        Simulation duration: 0:02:21.565221
+        Virtual stop time: 0.0375 s
+        Virtual stop frame: 6001
+        Velocity consecutive difference: 5.55e-05
+
+Test de performance du de main.py avec classes encapsulées. Max frame = 2001. N=36. Temps: 51''.
+        Parameters: (L, D, N, $\Delta t$)=(0.002, 1.5e-05, 36, 6.25e-06)
+        Simulation duration: 0:00:51.378769
+        Virtual stop time: 0.0125 s
+        Virtual stop frame: 2001
+        Velocity consecutive difference: 4.82e-05
+
+Test de performance du de main.py avec classes encapsulées. Max frame = 6001. N=36. Temps: 2'21".
+        Parameters: (L, D, N, $\Delta t$)=(0.002, 1.5e-05, 36, 6.25e-06)
+        Simulation duration: 0:02:21.046985
+        Virtual stop time: 0.0375 s
+        Virtual stop frame: 6001
+        Velocity consecutive difference: 5.55e-05
+
+Test de performance du de main.py avec classes encapsulées mais sans __slots__. Max frame = 2001. N=36. Temps: 51".
+        Parameters: (L, D, N, $\Delta t$)=(0.002, 1.5e-05, 36, 6.25e-06)
+        Simulation duration: 0:00:51.441330
+        Virtual stop time: 0.0125 s
+        Virtual stop frame: 2001
+        Velocity consecutive difference: 4.82e-05
+
+Test de performance de main.py avec classes encapsulées et numba functions dans pressure_field.py. Max Frame = 2001. N=36. Temps: 5"
+        Parameters: (L, D, N, $\Delta t$)=(0.002, 1.5e-05, 36, 6.25e-06)
+        Simulation duration: 0:00:05.566018
+        Virtual stop time: 0.0125 s
+        Virtual stop frame: 2001
+        Velocity consecutive difference: 4.82e-05
+
+Test de performance de main.py avec classes encapsulées et numba functions dans pressure_field.py. Max Frame = 6001. N=36. Temps: 5"
+        Parameters: (L, D, N, $\Delta t$)=(0.002, 1.5e-05, 36, 6.25e-06)
+        Simulation duration: 0:00:07.008001
+        Virtual stop time: 0.0375 s
+        Virtual stop frame: 6001
+        Velocity consecutive difference: 5.55e-05

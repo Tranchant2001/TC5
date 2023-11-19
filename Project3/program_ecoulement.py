@@ -26,6 +26,7 @@ import datetime
 from numba import float32, int8, boolean, double, int16
 from numba import njit
 from numba.experimental import jitclass
+from matplotlib.ticker import FormatStrFormatter
 
 
 ### GENERAL FUNCTIONS   ###
@@ -40,7 +41,6 @@ class Field():
         self.got_ghost_cells = got_ghost_cells
         self.ghost_thick = ghost_thick
         
-    
     
     def _addGhosts(self, thick:int):
 
@@ -58,7 +58,6 @@ class Field():
 
         self.values = np.where(np.absolute(self.values) < epsilon, 0., self.values)
 
-
     
     def _stripGhosts(self):
 
@@ -70,7 +69,6 @@ class Field():
             self.shape = self.values.shape
             self.got_ghost_cells = False
             self.ghost_thick = 0
-
 
     
     def _get_metric(self):
@@ -178,7 +176,8 @@ class VelocityField():
         self.norm = Field(np.empty((self.N , self.N)), dx, self.got_ghost_cells, self.ghost_thick)
         self.norm._stripGhosts()
         self.metric = 1.
-        # self.update_metric()
+        self.strain_rate = np.zeros(self.N-2*self.ghost_thick, dtype=np.float32)
+        self.max_strain_rate = 0.
 
 
     def _addGhosts(self, thick):
@@ -309,6 +308,12 @@ class VelocityField():
             self.metric = std / mean
 
 
+        # Process the strain rate on the slipping wall:
+        slipping_wall_v = self.v.values[:, thick]
+        self.strain_rate = np.absolute(np.gradient(slipping_wall_v)[thick:-thick])
+        self.max_strain_rate = np.max(self.strain_rate)
+
+
     def plot(self, X, Y, **kwargs):
 
         if self.got_ghost_cells:
@@ -322,20 +327,37 @@ class VelocityField():
             v = self.v.values
 
         # Create a figure and axis for the animation
-        fig, ax = plt.subplots() 
+        fig1, ax1 = plt.subplots() 
         
         # Plot the scalar field
-        ax.clear()
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
+        ax1.clear()
+        ax1.set_xlabel('X')
+        ax1.set_ylabel('Y')
         if 'title' in kwargs.keys():
-            ax.set_title(kwargs.get('title'))
-        ax.quiver(X, Y, u, v, scale=5)
+            ax1.set_title(kwargs.get('title'))
+        ax1.quiver(X, Y, u, v, scale=5)
         if 'saveaspng' in kwargs.keys():
             plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
         if 'pause' in kwargs.keys():
             plt.pause(kwargs.get('pause'))
-        plt.close(fig)
+        plt.close(fig1)
+
+
+    def plot_strain_rate(self, y, **kwargs):
+
+        fig2, ax2 = plt.subplots()
+        ax2.clear()
+        ax2.set_xlabel('Y (mm)')
+        ax2.set_ylabel('Strain rate (Hz)')
+        if 'title' in kwargs.keys():
+            ax2.set_title(kwargs.get('title'))
+        ax2.plot(1000*y, self.strain_rate)
+        ax2.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
+        if 'saveaspng' in kwargs.keys():
+            plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+        if 'pause' in kwargs.keys():
+            plt.pause(kwargs.get('pause'))
+        plt.close(fig2)
 
 
 
@@ -363,6 +385,7 @@ class PressureField(Field):
             self.got_ghost_cells = False
 
         self.N = self.shape[0]
+        self.last_nb_iter = -1
 
 
     def _fillGhosts(self):
@@ -439,13 +462,13 @@ class PressureField(Field):
         # there may be problems at the edges so they are not considered to process the residual norm
         residu = residu[thick : -thick, thick : -thick]
 
-        return np.std(residu) / np.mean(residu)
+        return np.mean(residu)
 
 
 
 class CounterFlowCombustion():
 
-    def __init__(self, L:float, physN:float, L_slot:float, L_coflow:float, D:float, pho:float, max_t_comput:datetime.timedelta, show_save:bool, ell_crit:float, div_crit:float):
+    def __init__(self, L:float, physN:float, L_slot:float, L_coflow:float, D:float, pho:float, max_t_comput:datetime.timedelta, show_save:bool, ell_crit:float, div_crit:float, conv_crit:float):
 
         self.L = L
         self.physN = physN
@@ -457,6 +480,7 @@ class CounterFlowCombustion():
         self.show_save = show_save
         self.ell_crit = ell_crit
         self.div_crit = div_crit
+        self.conv_crit = conv_crit
 
         self.dx = L/physN
         max_u = 1. # because the max inlet velocity is 1 m/s.
@@ -470,6 +494,7 @@ class CounterFlowCombustion():
         self.omega = 2*(1 - math.pi/physN - (math.pi/physN)**2)
         #self.omega = 1.5    # omega parameter evaluation of the SOR method
 
+        self.y = np.linspace(0, L, physN, endpoint=True, dtype=np.float32)
         # Create mesh grid
         #self.X, self.Y = np.meshgrid(np.linspace(0, L, physN, endpoint=True) , np.linspace(0, L, N, endpoint=True))
         #self.I, self.J = np.meshgrid(np.linspace(0, N, N, endpoint=True, dtype=int) , np.linspace(0, N, N, endpoint=True, dtype=int))
@@ -523,6 +548,8 @@ class CounterFlowCombustion():
             eps = P.residual_error(beta_arr)
 
             kiter += 1
+        
+        P.last_nb_iter = kiter-1
 
         return P
 
@@ -603,7 +630,11 @@ class CounterFlowCombustion():
         # Initialize Velocity field
         uv = VelocityField(np.zeros((self.physN, self.physN), dtype=float), np.zeros((self.physN, self.physN), dtype=float) , dx, L_slot, L_coflow, False, thick)
         uv.update_metric()
-        
+
+        # Initalize uvcopy
+        uvcopy = VelocityField(np.zeros((self.physN, self.physN), dtype=float), np.zeros((self.physN, self.physN), dtype=float) , dx, L_slot, L_coflow, False, thick)
+        uv_conv_residual = 1.0
+
         # Initializing the V* field
         uvet = VelocityField(np.zeros((self.physN, self.physN), dtype=float), np.zeros((self.physN, self.physN), dtype=float) , dx, L_slot, L_coflow, False, thick)
         uvet.update_metric()
@@ -612,28 +643,39 @@ class CounterFlowCombustion():
         Press = PressureField(np.full((self.physN, self.physN), 1.0), dx, False, thick)
 
         # Set time to zero
-        time = 0
+        time = 0.
         
         # Set frame counting to zero
         frame = 0
+        # Set frame period between 2 plot rounds
+        frame_period = 50
         
         start_datetime = datetime.datetime.now()
         stop_datetime = datetime.datetime.now()
 
 
-        while uv.metric >= 0.05 and uv.metric < self.div_crit and stop_datetime - start_datetime < self.max_t_comput:
+        while uv_conv_residual >= self.conv_crit and uv.metric < self.div_crit and stop_datetime - start_datetime < self.max_t_comput:
             
             time = frame * dt
-            
-            if frame%50 == 0:
-                print(f"Frame=\t{frame}\t;\tVirtual time={time}")
+
+            if frame%frame_period == 0:
+                
+                if frame != 0:
+                    uv_conv_residual = velocity_residual(uvcopy, uv)
+
+                print(f"Frame=\t{frame:06}\t ; \tVirtual time={time:.2e} s\t;\tLast SOR nb iter={Press.last_nb_iter}\t;\tVelocity Residual={uv_conv_residual:.2e}")
                 if self.show_save:
 
                     uv.v.plot(True, title=f'V Field k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s \n Metric: {uv.metric:.5f}',saveaspng=str(frame)+"_v_field.png")
                     uv.u.plot(True, title=f'U Field k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s \n Metric: {uv.metric:.5f}',saveaspng=str(frame)+"_u_field.png")
+                    uv.plot_strain_rate(self.y, title="Spatial representation of th strain rate along the slipping wall", saveaspng=str(frame)+"_strain_rate.png")
                     Press.plot(True, title=f'Pressure Field k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(frame)+"_press_field.png")
 
                     stop_datetime = datetime.datetime.now()
+
+            elif frame%frame_period == frame_period-1 :
+                uvcopy = copy(uv)
+
             # uvet = self._update_RK2(uv)
             self._update_RK2(uv, uvet)
             uvet.update_metric()
@@ -678,7 +720,27 @@ class CounterFlowCombustion():
             print(f"\tVelocity norm: {uv.metric:5f}")
 
 
+### MISC    ###
 
+def copy(uv:VelocityField) -> VelocityField:
+    N = uv.N
+    new = VelocityField(np.zeros((N, N), dtype=np.float32), np.zeros((N, N), dtype=np.float32), uv.dx, uv.L_slot, uv.L_slot, uv.got_ghost_cells, uv.ghost_thick)
+    new.v.values = np.copy(uv.v.values)
+    new.u.values = np.copy(uv.u.values)
+    new.update_metric()
+
+    return new
+
+
+def velocity_residual(uv0:VelocityField, uv1:VelocityField) -> np.float32:
+    thick0 = uv0.ghost_thick
+    u0 = uv0.u.values[thick0:-thick0 , thick0:-thick0]
+    v0 = uv0.v.values[thick0:-thick0 , thick0:-thick0]
+    thick1 = uv1.ghost_thick
+    u1 = uv1.u.values[thick1:-thick1 , thick1:-thick1]
+    v1 = uv1.v.values[thick1:-thick1 , thick1:-thick1]
+
+    return np.mean(np.sqrt((u0 - u1)**2 + (v0 - v1)**2))
 
 ### MAIN    ###
 
@@ -711,11 +773,12 @@ def main():
     show_and_save = True
 
     # Stop threshold of elliptic solver
-    ell_crit = 1e-2
+    ell_crit = 1e-3
     # Divergence stop cirterion
     div_crit = 100.
+    conv_crit = 1e-1
 
-    mysimu = CounterFlowCombustion(L, N, L_slot, L_coflow, D, pho, max_time_computation, show_and_save, ell_crit, div_crit)
+    mysimu = CounterFlowCombustion(L, N, L_slot, L_coflow, D, pho, max_time_computation, show_and_save, ell_crit, div_crit, conv_crit)
     mysimu.compute()
  
 
