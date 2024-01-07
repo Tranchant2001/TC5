@@ -142,6 +142,9 @@ class Dinitrogen(Species):
             self.got_ghost_cells = False
 
         self.N = self.shape[0]
+
+        # Initializing the thickness of the diffusive zone in mm.
+        self.diff_zone_thick = 0.
     
     def fillGhosts(self):
             

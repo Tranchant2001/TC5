@@ -17,7 +17,7 @@ class CounterFlowCombustion():
 
     #__slots__ = "L", "physN", "L_slot", "L_coflow", "D", "pho", "max_t_comput", "show_save", "register_period", "ell_crit", "div_crit", "conv_crit", "dx", "dt", "omega", "y", "ghost_thick", "N"
     
-    def __init__(self, L:float, physN:float, L_slot:float, L_coflow:float, nu:float, D:float, a:float, pho:float, Ta:float, max_t_comput:datetime.timedelta, show_save:bool, register_period:int, ell_crit:float, div_crit:float, conv_crit:float):
+    def __init__(self, L:float, physN:float, L_slot:float, L_coflow:float, nu:float, D:float, a:float, pho:float, Ta:float, time_ignite:float, max_t_comput:datetime.timedelta, show_save:bool, register_period:int, ell_crit:float, div_crit:float, conv_crit:float):
 
         self.L = L
         self.physN = physN
@@ -28,6 +28,7 @@ class CounterFlowCombustion():
         self.a = a
         self.pho = pho
         self.Ta = Ta
+        self.time_ignite = time_ignite
         self.max_t_comput = max_t_comput
         self.show_save = show_save
         self.register_period = register_period
@@ -279,6 +280,9 @@ class CounterFlowCombustion():
         # Initializing the temperature
         #Temp = TemperatureField(np.full((physN, physN), 298.15), dx, False, thick)
 
+        #Initializing the thickness of the diffusive zone.
+        diffz_thick = 0.
+
         # Set time to zero
         time = 0.
         
@@ -340,36 +344,22 @@ class CounterFlowCombustion():
         # Plots of the final frame
         misc.plot_field(uv.v, True, title=f'V Field k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s \n Metric: {uv.metric:.5f}',saveaspng=str(frame)+"_v_field.png")
         misc.plot_field(uv.u, True, title=f'U Field k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s \n Metric: {uv.metric:.5f}',saveaspng=str(frame)+"_u_field.png")
-        misc.plot_strain_rate(uv, self.y, title=f"Spatial representation of th strain rate along the slipping wall\nMax is {uv.max_strain_rate:.2e} Hz", saveaspng=str(frame)+"_strain_rate.png")
+        misc.plot_strain_rate(uv, self.y, title=f"Spatial representation of th strain rate along the slipping wall\nMax is {uv.max_strain_rate:.4e} Hz", saveaspng=str(frame)+"_strain_rate.png")
         misc.plot_field(Press, True, title=f'Pressure Field k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(frame)+"_press_field.png")
-        misc.plot_field(o2, True, title=f'O2 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame+"_O2.png"))
-        misc.plot_field(n2, True, title=f'N2 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame+"_N2.png"))
-        misc.plot_field(ch4, True, title=f'CH4 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame+"_CH4.png"))
-        misc.plot_field(h2o, True, title=f'H2O Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame+"_H2O.png"))
-        misc.plot_field(co2, True, title=f'CO2 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame+"_CO2.png"))
+        misc.plot_field(o2, True, title=f'O2 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame)+"_O2.png")
+        misc.plot_field(n2, True, title=f'N2 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame)+"_N2.png")
+        misc.plot_field(ch4, True, title=f'CH4 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame)+"_CH4.png")
+        misc.plot_field(h2o, True, title=f'H2O Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame)+"_H2O.png")
+        misc.plot_field(co2, True, title=f'CO2 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame)+"_CO2.png")
         misc.plot_diffusive_zone(n2, self.y, frame, dt, time)
 
-        if uv.metric >= self.div_crit :        
-            print(f"Warning: The simulation stopped running because a divergence was detected (vel_metric >= {self.div_crit}).")
-            print(f"\tParameters: (L, D, N, $\Delta t$)=({self.L}, {self.D}, {N}, {dt})")
-            print("\tSimulation duration: "+str(stop_datetime - start_datetime))
-            print(f"\tVirtual stop time: {time} s")   
-            print(f"\tVirtual stop frame: {frame}")
-            print(f"\tVelocity consecutive difference: {uv_consecutive_diff:.2e}")
-
+        # About to print and write in final file the report of the simulation.
+        if uv.metric >= self.div_crit :
+            code = "divergence"        
         elif stop_datetime - start_datetime >= self.max_t_comput:
-            print("Warning: The simulation stopped running because the max duration of simulation ("+str(self.max_t_comput)+") was reached.")
-            print(f"\tParameters: (L, D, N, $\Delta t$)=({self.L}, {self.D}, {N}, {dt})")
-            print("\tSimulation duration: "+str(stop_datetime - start_datetime))
-            print(f"\tVirtual stop time: {time} s")
-            print(f"\tVirtual stop frame: {frame}")
-            print(f"\tVelocity consecutive difference: {uv_consecutive_diff:.2e}")
-
+            code = "timeout"
         else:
-            print(f"Success: The simulation stopped running because the velocity field was stable enough (uv_consecutive_difference < {self.conv_crit:.2e}).")
-            print(f"\tParameters: (L, D, N, $\Delta t$)=({self.L}, {self.D}, {N}, {dt})")
-            print("\tSimulation duration: "+str(stop_datetime - start_datetime))
-            print(f"\tVirtual stop time: {time} s")        
-            print(f"\tVirtual stop frame: {frame}")
-            print(f"\tVelocity consecutive difference: {uv_consecutive_diff:.2e}")
+            code = "success"
+
+        misc.print_write_end_message(code, self.div_crit, self.max_t_comput, self.conv_crit, self.L, self.D, N, dt, stop_datetime-start_datetime, time, frame, uv_consecutive_diff, uv.max_strain_rate, n2.diff_zone_thick)
 

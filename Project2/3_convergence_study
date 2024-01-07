@@ -72,7 +72,7 @@ def boundary_cond(U_field, N):
 def convergence_error(un, un1, N):
 
     minus_arr = un1 - un
-    error = np.sum(np.absolute(minus_arr))/N**2
+    error = np.mean(np.absolute(minus_arr))
     return error
 
 
