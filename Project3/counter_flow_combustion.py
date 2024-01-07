@@ -230,6 +230,38 @@ class CounterFlowCombustion():
         species_field.fillGhosts()
 
 
+    def _converge_all_species(self, o2:Dioxygen, n2:Dinitrogen, ch4:Methane, h2o:Water, co2:CarbonDioxide, T_field:TemperatureField, dtchem:float, conv_crit_chem):
+
+        thick = self.ghost_thick
+
+        all_converg = np.full(5, 1.)
+        while np.sum(np.where(all_converg > conv_crit_chem, False, True)) < 5:
+            o20 = np.copy(o2.values)
+            n20 = np.copy(n20.values)
+            ch40 = np.copy(ch40.values)
+            h2o0 = np.copy(h2o0.values)
+            co20 = np.copy(co20.values)
+
+            Q = self.progress_rate(ch4, o2, T_field)
+
+            o2.values = o2.values + dtchem*o2.stoech*o2.W*Q
+            n2.values = n2.values + dtchem*n2.stoech*n2.W*Q
+            ch4.values = ch4.values + dtchem*ch4.stoech*ch4.W*Q
+            h2o.values = h2o.values + dtchem*h2o.stoech*h2o.W*Q
+            co2.values = co2.values + dtchem*co2.stoech*co2.W*Q
+
+            all_converg[0] = misc.array_residual(o20, thick, o2.values, thick)
+            all_converg[1] = misc.array_residual(n20, thick, n2.values, thick)
+            all_converg[2] = misc.array_residual(ch40, thick, ch4.values, thick)
+            all_converg[3] = misc.array_residual(h2o0, thick, h2o.values, thick)
+            all_converg[4] = misc.array_residual(co20, thick, co2.values, thick)
+
+            
+
+
+
+
+
     def progress_rate(self, ch4_field:Methane, o2_field:Dioxygen, T_field:TemperatureField):
         
         ch4_field.update_concentration()

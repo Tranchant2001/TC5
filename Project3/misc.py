@@ -62,11 +62,21 @@ def velocity_residual(uv0:VelocityField, uv1:VelocityField) -> np.float32:
     thick0 = uv0.ghost_thick
     u0 = uv0.u.values[thick0:-thick0 , thick0:-thick0]
     v0 = uv0.v.values[thick0:-thick0 , thick0:-thick0]
+    
     thick1 = uv1.ghost_thick
     u1 = uv1.u.values[thick1:-thick1 , thick1:-thick1]
     v1 = uv1.v.values[thick1:-thick1 , thick1:-thick1]
 
     return np.mean(np.sqrt((u0 - u1)**2 + (v0 - v1)**2))
+
+
+def array_residual(f0:np.ndarray, thick0:int, f1:np.ndarray, thick1:int) -> np.float32:
+    
+    v0 = np.copy(f0)[thick0:-thick0 , thick0:-thick0]
+
+    v1 = np.copy(f1)[thick1:-thick1 , thick1:-thick1]
+
+    return np.mean(np.sqrt((v0 - v1)**2))
 
 
 def plot_uv(uv:VelocityField, X, Y, **kwargs):
