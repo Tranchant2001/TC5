@@ -22,14 +22,19 @@ from counter_flow_combustion import CounterFlowCombustion
 
 
 # Parameters of the problem
-L = 2e-3     # Length in the square shape domain.
-D = 15e-6   # Diffusion coefficient
+L = 2e-3    # Length in the square shape domain.
+nu = 15e-6  # Velocity Diffusion coefficient.
+D = 15e-6   # Species Diffusion coefficient.
+a = 15e-6   # Temperature Diffusion coefficient.
 L_slot = 5e-4 # length of the inlet slot.
 L_coflow = 5e-4 # length of the inlet coflow.
 pho = 1.1614 # Fluid density.
+Temp_a = 10000 # Temperature in Arhenus' law.
+c_p = 1200.
+
 
 # Initial Parameters of the simulation
-N = 1024    # Number of steps for each space axis
+N = 32    # Number of steps for each space axis
 
 
 # Put here the maximum time you want to spend on the computation.
@@ -42,7 +47,7 @@ register_period = 10000
 ell_crit = 2e-4
 # Divergence stop cirterion
 div_crit = 100.
-conv_crit = 5e-6
+conv_crit = 8e-6
 
-mysimu = CounterFlowCombustion(L, N, L_slot, L_coflow, D, pho, max_time_computation, show_and_save, register_period, ell_crit, div_crit, conv_crit)
+mysimu = CounterFlowCombustion(L, N, L_slot, L_coflow, nu, D, a, pho, Temp_a, max_time_computation, show_and_save, register_period, ell_crit, div_crit, conv_crit)
 mysimu.compute()
