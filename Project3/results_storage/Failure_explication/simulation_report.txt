@@ -1,8 +1,0 @@
-Warning: The simulation stopped running because the max duration of simulation (0:05:00) was reached.
-	Parameters: (L, D, N, $\Delta t$)=(0.002, 1.5e-05, 36, 6.25e-06)
-	Simulation duration: 0:06:56.833413
-	Virtual stop time: 0.1875 s
-	Virtual stop frame: 30001
-	Velocity consecutive difference: 2.62e-04
-	Maximum strain rate on the left wall: 2785.509521484375 Hz
-	Thickness of the diffusive zone: 0.25 mm
