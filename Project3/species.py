@@ -57,7 +57,7 @@ class Dioxygen(Species):
 
     #__slots__ = "values", "dx", "L_slot", "L_coflow", "got_ghost_cells", "ghost_thick"
 
-    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, got_ghost_cells=False, ghost_thick=0):
+    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, uv:VelocityField, got_ghost_cells=False, ghost_thick=0):
 
         super().__init__(array, dx, L_slot, L_coflow, 31.999e-3, -2, pho, "O_{2}", got_ghost_cells, ghost_thick)
 
@@ -66,47 +66,60 @@ class Dioxygen(Species):
         if got_ghost_cells and ghost_thick > 0:
             self.ghost_thick = ghost_thick
             self.got_ghost_cells = True
-            self.fillGhosts()
+            self.fillGhosts(uv)
 
         elif not got_ghost_cells and ghost_thick > 0:
             self.ghost_thick = 0
             self.got_ghost_cells = False          
             self._addGhosts(ghost_thick)
-            self.fillGhosts()
+            self.fillGhosts(uv)
 
         else:
             self.ghost_thick = 0
             self.got_ghost_cells = False
 
         self.N = self.shape[0]
-                   
-    def fillGhosts(self):
+                
+    def fillGhosts(self, uv:VelocityField):
     
         Y = self.values
         thick = self.ghost_thick
         dx = self.dx
         L_slot = self.L_slot
         L_coflow = self.L_coflow
+        u = uv.u.values
+        v = uv.v.values
         
         # length in nb of cells of the co_flow and the slot.
         N_inlet = int(L_slot/dx)
         N_coflow = int(L_coflow/dx)
         
-        # Walls Neumann boundary condition.
-        for i in range(thick):
-            Y[:, i] = Y[:, thick]
-            Y[:, -i-1] = Y[:, -thick-1]
-            Y[i, :] = Y[thick, :]
-            Y[-i-1, :] = Y[-1-thick, :]
+        ## Walls Neumann boundary condition.
+        # left wall
+        Y[:, thick] = np.where(u[:, thick] <= 0, (4*Y[:, thick+1] - Y[:, thick+2])/3, Y[:, thick])
+        Y[:, :thick] = np.tile(Y[:, thick], (thick, 1)).transpose()
+        
+        # right wall
+        Y[:, -thick-1] = np.where(u[:, -thick-1] >= 0, (4*Y[:, -thick-2] - Y[:, -thick-3])/3, Y[:, -thick-1])
+        Y[:, -thick:] = np.tile(Y[:, -thick-1], (thick, 1)).transpose()
 
+        # top wall
+        Y[thick, :] = np.where(v[thick, :] <= 0, (4*Y[thick+1,:] - Y[thick+2,:])/3, Y[thick,:])
+        Y[:thick, :] = np.tile(Y[thick,:], (thick, 1))
+
+        # bottom wall
+        Y[-thick-1, :] = np.where(v[-thick-1, :] >= 0, (4*Y[-thick-2,:] - Y[-thick-3,:])/3, Y[-thick-1,:])
+        Y[-thick:, :] = np.tile(Y[-thick-1,:], (thick, 1))
+
+        ## Dirichlet conditions with inlets and outlets.
         # Bottom slot    
-        Y[-thick : , thick : thick + N_inlet] = 0.2
+        Y[-thick-1 : , thick : thick + N_inlet] = 0.2
         # Top slot
-        Y[ : thick, thick : thick + N_inlet] = 0.0
+        Y[ : thick+1, thick : thick + N_inlet] = 0.0
         # Bottom coflow
-        Y[-thick : , thick + N_inlet : thick + N_inlet + N_coflow] = 0.0
+        Y[-thick-1 : , thick + N_inlet : thick + N_inlet + N_coflow] = 0.0
         # Top coflow
-        Y[ : thick, thick + N_inlet : thick + N_inlet + N_coflow] = 0.0
+        Y[ : thick+1, thick + N_inlet : thick + N_inlet + N_coflow] = 0.0
 
         # Dead corner values filled with -1.0
         Y[:thick, :thick] = -1.0
@@ -120,7 +133,7 @@ class Dinitrogen(Species):
 
     #__slots__ = "values", "dx", "L_slot", "L_coflow", "got_ghost_cells", "ghost_thick"
 
-    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, got_ghost_cells=False, ghost_thick=0):
+    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, uv:VelocityField, got_ghost_cells=False, ghost_thick=0):
 
         super().__init__(array, dx, L_slot, L_coflow, 28.01e-3, 0, pho, "N_{2}", got_ghost_cells, ghost_thick)
 
@@ -129,13 +142,13 @@ class Dinitrogen(Species):
         if got_ghost_cells and ghost_thick > 0:
             self.ghost_thick = ghost_thick
             self.got_ghost_cells = True
-            self.fillGhosts()
+            self.fillGhosts(uv)
 
         elif not got_ghost_cells and ghost_thick > 0:
             self.ghost_thick = 0
             self.got_ghost_cells = False          
             self._addGhosts(ghost_thick)
-            self.fillGhosts()
+            self.fillGhosts(uv)
 
         else:
             self.ghost_thick = 0
@@ -146,33 +159,46 @@ class Dinitrogen(Species):
         # Initializing the thickness of the diffusive zone in mm.
         self.diff_zone_thick = 0.
     
-    def fillGhosts(self):
+    def fillGhosts(self, uv:VelocityField):
             
         Y = self.values
         thick = self.ghost_thick
         dx = self.dx
         L_slot = self.L_slot
         L_coflow = self.L_coflow
+        u = uv.u.values
+        v = uv.v.values
         
         # length in nb of cells of the co_flow and the slot.
         N_inlet = int(L_slot/dx)
         N_coflow = int(L_coflow/dx)
         
-        # Walls Neumann boundary condition.
-        for i in range(thick):
-            Y[:, i] = Y[:, thick]
-            Y[:, -i-1] = Y[:, -thick-1]
-            Y[i, :] = Y[thick, :]
-            Y[-i-1, :] = Y[-1-thick, :]
+        ## Walls Neumann boundary condition.
+        # left wall
+        Y[:, thick] = np.where(u[:, thick] <= 0, (4*Y[:, thick+1] - Y[:, thick+2])/3, Y[:, thick])
+        Y[:, :thick] = np.tile(Y[:, thick], (thick, 1)).transpose()
+        
+        # right wall
+        Y[:, -thick-1] = np.where(u[:, -thick-1] >= 0, (4*Y[:, -thick-2] - Y[:, -thick-3])/3, Y[:, -thick-1])
+        Y[:, -thick:] = np.tile(Y[:, -thick-1], (thick, 1)).transpose()
 
+        # top wall
+        Y[thick, :] = np.where(v[thick, :] <= 0, (4*Y[thick+1,:] - Y[thick+2,:])/3, Y[thick,:])
+        Y[:thick, :] = np.tile(Y[thick,:], (thick, 1))
+
+        # bottom wall
+        Y[-thick-1, :] = np.where(v[-thick-1, :] >= 0, (4*Y[-thick-2,:] - Y[-thick-3,:])/3, Y[-thick-1,:])
+        Y[-thick:, :] = np.tile(Y[-thick-1,:], (thick, 1))
+
+        ## Dirichlet conditions with inlets and outlets.
         # Bottom slot    
-        Y[-thick : , thick : thick + N_inlet] = 0.8
+        Y[-thick-1 : , thick : thick + N_inlet] = 0.8
         # Top slot
-        Y[ : thick, thick : thick + N_inlet] = 0.0
+        Y[ : thick+1, thick : thick + N_inlet] = 0.0
         # Bottom coflow
-        Y[-thick : , thick + N_inlet : thick + N_inlet + N_coflow] = 1.0
+        Y[-thick-1 : , thick + N_inlet : thick + N_inlet + N_coflow] = 1.0
         # Top coflow
-        Y[ : thick, thick + N_inlet : thick + N_inlet + N_coflow] = 1.0
+        Y[ : thick+1, thick + N_inlet : thick + N_inlet + N_coflow] = 1.0
 
         # Dead corner values filled with -1.0
         Y[:thick, :thick] = -1.0
@@ -186,7 +212,7 @@ class Methane(Species):
 
     #__slots__ = "values", "dx", "L_slot", "L_coflow", "got_ghost_cells", "ghost_thick"
 
-    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, got_ghost_cells=False, ghost_thick=0):
+    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, uv:VelocityField, got_ghost_cells=False, ghost_thick=0):
 
         super().__init__(array, dx, L_slot, L_coflow, 16.04e-3, -1, pho, "CH_{4}", got_ghost_cells, ghost_thick)
 
@@ -195,13 +221,13 @@ class Methane(Species):
         if got_ghost_cells and ghost_thick > 0:
             self.ghost_thick = ghost_thick
             self.got_ghost_cells = True
-            self.fillGhosts()
+            self.fillGhosts(uv)
 
         elif not got_ghost_cells and ghost_thick > 0:
             self.ghost_thick = 0
             self.got_ghost_cells = False          
             self._addGhosts(ghost_thick)
-            self.fillGhosts()
+            self.fillGhosts(uv)
 
         else:
             self.ghost_thick = 0
@@ -209,33 +235,46 @@ class Methane(Species):
 
         self.N = self.shape[0]
 
-    def fillGhosts(self):
+    def fillGhosts(self, uv:VelocityField):
 
         Y = self.values
         thick = self.ghost_thick
         dx = self.dx
         L_slot = self.L_slot
         L_coflow = self.L_coflow
+        u = uv.u.values
+        v = uv.v.values
         
         # length in nb of cells of the co_flow and the slot.
         N_inlet = int(L_slot/dx)
         N_coflow = int(L_coflow/dx)
         
-        # Walls Neumann boundary condition.
-        for i in range(thick):
-            Y[:, i] = Y[:, thick]
-            Y[:, -i-1] = Y[:, -thick-1]
-            Y[i, :] = Y[thick, :]
-            Y[-i-1, :] = Y[-1-thick, :]
+        ## Walls Neumann boundary condition.
+        # left wall
+        Y[:, thick] = np.where(u[:, thick] <= 0, (4*Y[:, thick+1] - Y[:, thick+2])/3, Y[:, thick])
+        Y[:, :thick] = np.tile(Y[:, thick], (thick, 1)).transpose()
+        
+        # right wall
+        Y[:, -thick-1] = np.where(u[:, -thick-1] >= 0, (4*Y[:, -thick-2] - Y[:, -thick-3])/3, Y[:, -thick-1])
+        Y[:, -thick:] = np.tile(Y[:, -thick-1], (thick, 1)).transpose()
 
+        # top wall
+        Y[thick, :] = np.where(v[thick, :] <= 0, (4*Y[thick+1,:] - Y[thick+2,:])/3, Y[thick,:])
+        Y[:thick, :] = np.tile(Y[thick,:], (thick, 1))
+
+        # bottom wall
+        Y[-thick-1, :] = np.where(v[-thick-1, :] >= 0, (4*Y[-thick-2,:] - Y[-thick-3,:])/3, Y[-thick-1,:])
+        Y[-thick:, :] = np.tile(Y[-thick-1,:], (thick, 1))
+
+        ## Dirichlet conditions with inlets and outlets.
         # Bottom slot    
-        Y[-thick : , thick : thick + N_inlet] = 0.
+        Y[-thick-1 : , thick : thick + N_inlet] = 0.
         # Top slot
-        Y[ : thick, thick : thick + N_inlet] = 1.
+        Y[ : thick+1, thick : thick + N_inlet] = 1.
         # Bottom coflow
-        Y[-thick : , thick + N_inlet : thick + N_inlet + N_coflow] = 0.
+        Y[-thick-1 : , thick + N_inlet : thick + N_inlet + N_coflow] = 0.
         # Top coflow
-        Y[ : thick, thick + N_inlet : thick + N_inlet + N_coflow] = 0.
+        Y[ : thick+1, thick + N_inlet : thick + N_inlet + N_coflow] = 0.
 
         # Dead corner values filled with -1.0
         Y[:thick, :thick] = -1.0
@@ -249,7 +288,7 @@ class Water(Species):
 
     #__slots__ = "values", "dx", "L_slot", "L_coflow", "got_ghost_cells", "ghost_thick"
 
-    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, got_ghost_cells=False, ghost_thick=0):
+    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, uv:VelocityField, got_ghost_cells=False, ghost_thick=0):
 
         super().__init__(array, dx, L_slot, L_coflow, 18.01528e-3, 2, pho, "H_{2}O", got_ghost_cells, ghost_thick)
 
@@ -258,13 +297,13 @@ class Water(Species):
         if got_ghost_cells and ghost_thick > 0:
             self.ghost_thick = ghost_thick
             self.got_ghost_cells = True
-            self.fillGhosts()
+            self.fillGhosts(uv)
 
         elif not got_ghost_cells and ghost_thick > 0:
             self.ghost_thick = 0
             self.got_ghost_cells = False          
             self._addGhosts(ghost_thick)
-            self.fillGhosts()
+            self.fillGhosts(uv)
 
         else:
             self.ghost_thick = 0
@@ -272,33 +311,46 @@ class Water(Species):
 
         self.N = self.shape[0]
 
-    def fillGhosts(self):
+    def fillGhosts(self, uv:VelocityField):
 
         Y = self.values
         thick = self.ghost_thick
         dx = self.dx
         L_slot = self.L_slot
         L_coflow = self.L_coflow
+        u = uv.u.values
+        v = uv.v.values
         
         # length in nb of cells of the co_flow and the slot.
         N_inlet = int(L_slot/dx)
         N_coflow = int(L_coflow/dx)
         
-        # Walls Neumann boundary condition.
-        for i in range(thick):
-            Y[:, i] = Y[:, thick]
-            Y[:, -i-1] = Y[:, -thick-1]
-            Y[i, :] = Y[thick, :]
-            Y[-i-1, :] = Y[-1-thick, :]
+        ## Walls Neumann boundary condition.
+        # left wall
+        Y[:, thick] = np.where(u[:, thick] <= 0, (4*Y[:, thick+1] - Y[:, thick+2])/3, Y[:, thick])
+        Y[:, :thick] = np.tile(Y[:, thick], (thick, 1)).transpose()
+        
+        # right wall
+        Y[:, -thick-1] = np.where(u[:, -thick-1] >= 0, (4*Y[:, -thick-2] - Y[:, -thick-3])/3, Y[:, -thick-1])
+        Y[:, -thick:] = np.tile(Y[:, -thick-1], (thick, 1)).transpose()
 
+        # top wall
+        Y[thick, :] = np.where(v[thick, :] <= 0, (4*Y[thick+1,:] - Y[thick+2,:])/3, Y[thick,:])
+        Y[:thick, :] = np.tile(Y[thick,:], (thick, 1))
+
+        # bottom wall
+        Y[-thick-1, :] = np.where(v[-thick-1, :] >= 0, (4*Y[-thick-2,:] - Y[-thick-3,:])/3, Y[-thick-1,:])
+        Y[-thick:, :] = np.tile(Y[-thick-1,:], (thick, 1))
+
+        ## Dirichlet conditions with inlets and outlets.
         # Bottom slot    
-        Y[-thick : , thick : thick + N_inlet] = 0.
+        Y[-thick-1 : , thick : thick + N_inlet] = 0.
         # Top slot
-        Y[ : thick, thick : thick + N_inlet] = 0.
+        Y[ : thick+1, thick : thick + N_inlet] = 0.
         # Bottom coflow
-        Y[-thick : , thick + N_inlet : thick + N_inlet + N_coflow] = 0.
+        Y[-thick-1 : , thick + N_inlet : thick + N_inlet + N_coflow] = 0.
         # Top coflow
-        Y[ : thick, thick + N_inlet : thick + N_inlet + N_coflow] = 0.
+        Y[ : thick+1, thick + N_inlet : thick + N_inlet + N_coflow] = 0.
 
         # Dead corner values filled with -1.0
         Y[:thick, :thick] = -1.0
@@ -312,7 +364,7 @@ class CarbonDioxide(Species):
 
     #__slots__ = "values", "dx", "L_slot", "L_coflow", "got_ghost_cells", "ghost_thick"
 
-    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, got_ghost_cells=False, ghost_thick=0):
+    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, uv:VelocityField, got_ghost_cells=False, ghost_thick=0):
 
         super().__init__(array, dx, L_slot, L_coflow, 44.01e-3, 1, pho, "CO_{2}", got_ghost_cells, ghost_thick)
 
@@ -321,13 +373,13 @@ class CarbonDioxide(Species):
         if got_ghost_cells and ghost_thick > 0:
             self.ghost_thick = ghost_thick
             self.got_ghost_cells = True
-            self.fillGhosts()
+            self.fillGhosts(uv)
 
         elif not got_ghost_cells and ghost_thick > 0:
             self.ghost_thick = 0
             self.got_ghost_cells = False          
             self._addGhosts(ghost_thick)
-            self.fillGhosts()
+            self.fillGhosts(uv)
 
         else:
             self.ghost_thick = 0
@@ -335,33 +387,46 @@ class CarbonDioxide(Species):
 
         self.N = self.shape[0]
 
-    def fillGhosts(self):
+    def fillGhosts(self, uv:VelocityField):
 
         Y = self.values
         thick = self.ghost_thick
         dx = self.dx
         L_slot = self.L_slot
         L_coflow = self.L_coflow
+        u = uv.u.values
+        v = uv.v.values
         
         # length in nb of cells of the co_flow and the slot.
         N_inlet = int(L_slot/dx)
         N_coflow = int(L_coflow/dx)
         
-        # Walls Neumann boundary condition.
-        for i in range(thick):
-            Y[:, i] = Y[:, thick]
-            Y[:, -i-1] = Y[:, -thick-1]
-            Y[i, :] = Y[thick, :]
-            Y[-i-1, :] = Y[-1-thick, :]
+        ## Walls Neumann boundary condition.
+        # left wall
+        Y[:, thick] = np.where(u[:, thick] <= 0, (4*Y[:, thick+1] - Y[:, thick+2])/3, Y[:, thick])
+        Y[:, :thick] = np.tile(Y[:, thick], (thick, 1)).transpose()
+        
+        # right wall
+        Y[:, -thick-1] = np.where(u[:, -thick-1] >= 0, (4*Y[:, -thick-2] - Y[:, -thick-3])/3, Y[:, -thick-1])
+        Y[:, -thick:] = np.tile(Y[:, -thick-1], (thick, 1)).transpose()
 
+        # top wall
+        Y[thick, :] = np.where(v[thick, :] <= 0, (4*Y[thick+1,:] - Y[thick+2,:])/3, Y[thick,:])
+        Y[:thick, :] = np.tile(Y[thick,:], (thick, 1))
+
+        # bottom wall
+        Y[-thick-1, :] = np.where(v[-thick-1, :] >= 0, (4*Y[-thick-2,:] - Y[-thick-3,:])/3, Y[-thick-1,:])
+        Y[-thick:, :] = np.tile(Y[-thick-1,:], (thick, 1))
+
+        ## Dirichlet conditions with inlets and outlets.
         # Bottom slot    
-        Y[-thick : , thick : thick + N_inlet] = 0.
+        Y[-thick-1 : , thick : thick + N_inlet] = 0.
         # Top slot
-        Y[ : thick, thick : thick + N_inlet] = 0.
+        Y[ : thick+1, thick : thick + N_inlet] = 0.
         # Bottom coflow
-        Y[-thick : , thick + N_inlet : thick + N_inlet + N_coflow] = 0.
+        Y[-thick-1 : , thick + N_inlet : thick + N_inlet + N_coflow] = 0.
         # Top coflow
-        Y[ : thick, thick + N_inlet : thick + N_inlet + N_coflow] = 0.
+        Y[ : thick+1, thick + N_inlet : thick + N_inlet + N_coflow] = 0.
 
         # Dead corner values filled with -1.0
         Y[:thick, :thick] = -1.0

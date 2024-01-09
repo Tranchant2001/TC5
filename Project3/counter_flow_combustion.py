@@ -224,10 +224,10 @@ class CounterFlowCombustion():
         #Q = self.progress_rate(ch4_field, o2_field, T_field)
         #species_field.update_reaction_rate(Q)
         species_field.values = y0 + 0.5*self.dt*self._f_species(u_arr, v_arr, species_field.values, species_field.reaction_rate)
-        species_field.fillGhosts()
+        species_field.fillGhosts(uv)
 
         species_field.values = y0 + self.dt*self._f_species(u_arr, v_arr, species_field.values, species_field.reaction_rate)
-        species_field.fillGhosts()
+        species_field.fillGhosts(uv)
 
 
     def progress_rate(self, ch4_field:Methane, o2_field:Dioxygen, T_field:TemperatureField):
@@ -271,11 +271,11 @@ class CounterFlowCombustion():
         Press = PressureField(np.full((physN, physN), 1.0), dx, False, thick)
 
         # Initializing the species
-        o2 = Dioxygen(np.full((physN, physN), 0.2, dtype=float), dx, L_slot, L_coflow, pho, False, thick)
-        n2 = Dinitrogen(np.full((physN, physN), 0.8 ,dtype=float), dx, L_slot, L_coflow, pho, False, thick)
-        ch4 = Methane(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, pho, False, thick)
-        h2o = Water(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, pho, False, thick)
-        co2 = CarbonDioxide(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, pho, False, thick)
+        o2 = Dioxygen(np.full((physN, physN), 0.2, dtype=float), dx, L_slot, L_coflow, pho, uv, False, thick)
+        n2 = Dinitrogen(np.full((physN, physN), 0.8 ,dtype=float), dx, L_slot, L_coflow, pho, uv, False, thick)
+        ch4 = Methane(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, pho, uv, False, thick)
+        h2o = Water(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, pho, uv, False, thick)
+        co2 = CarbonDioxide(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, pho, uv, False, thick)
 
         # Initializing the temperature
         #Temp = TemperatureField(np.full((physN, physN), 298.15), dx, False, thick)

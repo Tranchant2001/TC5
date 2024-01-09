@@ -35,11 +35,11 @@ c_p = 1200.
 
 
 # Initial Parameters of the simulation
-N = 45 # Number of steps for each space axis
+N = 32 # Number of steps for each space axis
 
 
 # Put here the maximum time you want to spend on the computation.
-max_time_computation = datetime.timedelta(hours=1, minutes=0)
+max_time_computation = datetime.timedelta(hours=0, minutes=5)
 # Show and register plots ?
 show_and_save = True
 register_period = 10000

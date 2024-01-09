@@ -99,30 +99,32 @@ class VelocityField():
             L_coflow = self.L_coflow
 
             # inlet and walls conditions for u
-            u_new[:,0:thick] = 0.
-            u_new[0:thick,:] = 0.
-            u_new[-thick:,:] = 0.
+            u_new[:,0:thick+1] = 0.
+            u_new[0:thick+1,:] = 0.
+            u_new[-thick-1:,:] = 0.
 
             # outlet condition
-            u_new[: , -thick:] = u_new[: , -2*thick : -thick]
-            v_new[: , -thick:] = v_new[: , -2*thick : -thick]
+            u_new[:, N-thick-1] = np.where(self.u.values[:, N-thick-1] >= 0, (4*u_new[:, N-thick-2] - u_new[:, N-thick-3])/3, u_new[:, N-thick-1]) # ensure derivative is zero on the first ghost cell.
+            v_new[:, N-thick-1] = np.where(self.u.values[:, N-thick-1] >= 0, (4*v_new[:, N-thick-2] - v_new[:, N-thick-3])/3, v_new[:, N-thick-1])
+            u_new[:, N-thick:] = np.tile(u_new[:, N-thick-1], (thick, 1)).transpose()
+            v_new[:, N-thick:] = np.tile(v_new[:, N-thick-1], (thick, 1)).transpose()
 
             # inlet conditions for v
             N_inlet = int(L_slot/dx)
             N_coflow = int(L_coflow/dx)
 
-            v_new[:thick, thick : thick + N_inlet] = np.full((thick, N_inlet), 1.0)
-            v_new[-thick:, thick : thick + N_inlet] = np.full((thick, N_inlet), -1.0)
+            v_new[:thick+1, thick : thick + N_inlet] = 1.0
+            v_new[-thick-1:, thick : thick + N_inlet] = -1.0
 
-            v_new[:thick, thick + N_inlet : thick + N_inlet + N_coflow] = np.full((thick, N_coflow), 0.2)
-            v_new[-thick:, thick + N_inlet : thick + N_inlet + N_coflow] = np.full((thick, N_coflow), -0.2)
+            v_new[:thick+1, thick + N_inlet : thick + N_inlet + N_coflow] = 0.2
+            v_new[-thick-1:, thick + N_inlet : thick + N_inlet + N_coflow] = -0.2
 
-            v_new[:thick, thick + N_inlet + N_coflow:] = 0.
-            v_new[-thick:, thick + N_inlet + N_coflow:] =  0.
+            v_new[:thick+1, thick + N_inlet + N_coflow:] = 0.
+            v_new[-thick-1:, thick + N_inlet + N_coflow:] =  0.
 
             # slipping wall simple
-            for j in range(thick):
-                v_new[:,j] = v_new[:,thick]
+            v_new[:, thick] = np.where(self.u.values[:, thick] <= 0, (4*v_new[:, thick+1] - v_new[:, thick+2])/3, v_new[:, thick])
+            v_new[:, :thick] = np.tile(v_new[:, thick], (thick, 1)).transpose()
 
             """
             # Other slipping wall conditions

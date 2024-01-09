@@ -72,13 +72,11 @@ class PressureField(Field):
             N = self.shape[0]
             P_new = np.copy(self.values)
 
-            P_new[:,-thick:] = np.full((N, thick), 1.0)
-            
-            for i in range(thick):
+            P_new[:,-thick-1:] = 1.0            
 
-                P_new[:,i] = P_new[:,thick]
-                P_new[i,:] = P_new[thick,:]
-                P_new[-i-1,:] = P_new[-thick-1,:]
+            P_new[:,:thick] = np.tile(P_new[:,thick+1], (thick,1)).transpose()
+            P_new[:thick,:] = np.tile(P_new[thick+1,:], (thick,1))
+            P_new[-thick:,:] = np.tile(P_new[-thick-2,:], (thick,1))
 
             # Dead corner values filled with -1.0
             P_new[:thick, :thick] = -1.0
