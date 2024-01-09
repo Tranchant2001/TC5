@@ -256,11 +256,6 @@ class CounterFlowCombustion():
             all_converg[3] = misc.array_residual(h2o0, thick, h2o.values, thick)
             all_converg[4] = misc.array_residual(co20, thick, co2.values, thick)
 
-            
-
-
-
-
 
     def progress_rate(self, ch4_field:Methane, o2_field:Dioxygen, T_field:TemperatureField):
         
