@@ -35,14 +35,14 @@ c_p = 1200.
 
 
 # Initial Parameters of the simulation
-N = 128 # Number of steps for each space axis
+N = 45 # Number of steps for each space axis
 
 
 # Put here the maximum time you want to spend on the computation.
 max_time_computation = datetime.timedelta(hours=1, minutes=0)
 # Show and register plots ?
 show_and_save = True
-register_period = 20000
+register_period = 10000
 
 # Stop threshold of elliptic solver
 ell_crit = 2e-4
