@@ -90,7 +90,7 @@ class CounterFlowCombustion():
     
         eps = 1.
         kiter = 1
-        maxiter = 100
+        maxiter = 999
         while eps > self.ell_crit and kiter < maxiter:
             if kiter%1002==1000:
                 print(f"\tElliptic Solver\ti={kiter}")
