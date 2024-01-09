@@ -15,9 +15,9 @@ import misc
 
 class CounterFlowCombustion():
 
-    #__slots__ = "L", "physN", "L_slot", "L_coflow", "D", "pho", "max_t_comput", "show_save", "register_period", "ell_crit", "div_crit", "conv_crit", "dx", "dt", "omega", "y", "ghost_thick", "N"
+    #__slots__ = "L", "physN", "L_slot", "L_coflow", "D", "rho", "max_t_comput", "show_save", "register_period", "ell_crit", "div_crit", "conv_crit", "dx", "dt", "omega", "y", "ghost_thick", "N"
     
-    def __init__(self, L:float, physN:float, L_slot:float, L_coflow:float, nu:float, D:float, a:float, pho:float, Ta:float, time_ignite:float, max_t_comput:datetime.timedelta, show_save:bool, register_period:int, ell_crit:float, div_crit:float, conv_crit:float):
+    def __init__(self, L:float, physN:float, L_slot:float, L_coflow:float, nu:float, D:float, a:float, rho:float, c_p:float, Ta:float, time_ignite:float, max_t_comput:datetime.timedelta, show_save:bool, register_period:int, ell_crit:float, div_crit:float, conv_crit:float):
 
         self.L = L
         self.physN = physN
@@ -26,7 +26,8 @@ class CounterFlowCombustion():
         self.nu = nu
         self.D = D
         self.a = a
-        self.pho = pho
+        self.rho = rho
+        self.c_p = c_p
         self.Ta = Ta
         self.time_ignite = time_ignite
         self.max_t_comput = max_t_comput
@@ -43,6 +44,7 @@ class CounterFlowCombustion():
         max_Fo = 0.25 # Fourier threshold in 2D
         max_CFL = 0.5 # CFL limit thresholf in 2D
         self.dt = 0.2*min(max_Fo*self.dx**2/D, max_CFL*self.dx/max_u)   # Time step
+        self.dtchem_list = self.set_dtchem_list(self.dt)
         #self.dt = 4e-6
         
         self.omega = 2*(1 - math.pi/physN - (math.pi/physN)**2)
@@ -55,6 +57,28 @@ class CounterFlowCombustion():
 
         self.ghost_thick = 2
         self.N = physN + 2*self.ghost_thick
+
+
+    def set_dtchem_list(self, dt):
+        
+        l0 = np.linspace(0, 1, 20, endpoint=False)
+        l1 = np.flip(1 - l0)
+        l2 = l1*l1*l1*l1
+        l3 = l2*dt
+        l4 = np.zeros(20, dtype=float)
+        l4[0] = l3[0]
+        for k in range(1, 20):
+            l4[k] = l3[k] - l3[k-1]
+
+        fig1 = plt.figure()
+        plt.plot(l3, label="Time piled up")
+        plt.plot(l4, label="$\Delta t$")
+        plt.xlabel("Index")
+        plt.ylabel("Time s")
+        plt.legend()
+        plt.show()
+
+        return l4
 
 
     def get_beta(self, uvet:VelocityField):
@@ -74,7 +98,7 @@ class CounterFlowCombustion():
 
         v_y = np.where(v < 0, forward_y, backward_y)
 
-        return (dx**2*self.pho/self.dt)*(u_x + v_y)
+        return (dx**2*self.rho/self.dt)*(u_x + v_y)
 
 
     def ell_solver(self, uvet:VelocityField, P:PressureField):
@@ -83,14 +107,14 @@ class CounterFlowCombustion():
         omega = self.omega
         dx =self.dx
         dt = self.dt
-        pho = self.pho
+        rho = self.rho
 
         # beta Laplcaian P converges to beta_arr
         beta_arr =self.get_beta(uvet)
     
         eps = 1.
         kiter = 1
-        maxiter = 100
+        maxiter = 999
         while eps > self.ell_crit and kiter < maxiter:
             if kiter%1002==1000:
                 print(f"\tElliptic Solver\ti={kiter}")
@@ -206,7 +230,7 @@ class CounterFlowCombustion():
 
         laplacian_phi = phi_xx + phi_yy
         
-        #return self.D*laplacian_phi - uval*phi_x - vval*phi_y + rr_arr/self.pho
+        #return self.D*laplacian_phi - uval*phi_x - vval*phi_y + rr_arr/self.rho
         return self.D*laplacian_phi - uval*phi_x - vval*phi_y
 
 
@@ -230,41 +254,52 @@ class CounterFlowCombustion():
         species_field.fillGhosts()
 
 
-    def _converge_all_species(self, o2:Dioxygen, n2:Dinitrogen, ch4:Methane, h2o:Water, co2:CarbonDioxide, T_field:TemperatureField, dtchem:float, conv_crit_chem):
+    def _converge_all_species(self, o2:Dioxygen, n2:Dinitrogen, ch4:Methane, h2o:Water, co2:CarbonDioxide, T_field:TemperatureField, dtchem:float): #, conv_crit_chem):
 
-        thick = self.ghost_thick
+        rho = self.rho
+        c_p = self.c_p
+        #thick = self.ghost_thick
 
-        all_converg = np.full(5, 1.)
-        while np.sum(np.where(all_converg > conv_crit_chem, False, True)) < 5:
-            o20 = np.copy(o2.values)
-            n20 = np.copy(n20.values)
-            ch40 = np.copy(ch40.values)
-            h2o0 = np.copy(h2o0.values)
-            co20 = np.copy(co20.values)
+        #all_converg = np.full(5, 1.)
+        #while np.sum(np.where(all_converg > conv_crit_chem, False, True)) < 5:
+        #o20 = np.copy(o2.values)
+        #n20 = np.copy(n20.values)
+        #ch40 = np.copy(ch40.values)
+        #h2o0 = np.copy(h2o0.values)
+        #co20 = np.copy(co20.values)
 
-            Q = self.progress_rate(ch4, o2, T_field)
+        Q = self.progress_rate(ch4, o2, T_field)
 
-            o2.values = o2.values + dtchem*o2.stoech*o2.W*Q
-            n2.values = n2.values + dtchem*n2.stoech*n2.W*Q
-            ch4.values = ch4.values + dtchem*ch4.stoech*ch4.W*Q
-            h2o.values = h2o.values + dtchem*h2o.stoech*h2o.W*Q
-            co2.values = co2.values + dtchem*co2.stoech*co2.W*Q
+        o2.values = o2.values + (dtchem*o2.stoech*o2.W/rho)*Q
+        n2.values = n2.values + (dtchem*n2.stoech*n2.W/rho)*Q
+        ch4.values = ch4.values + (dtchem*ch4.stoech*ch4.W/rho)*Q
+        h2o.values = h2o.values + (dtchem*h2o.stoech*h2o.W/rho)*Q
+        co2.values = co2.values + (dtchem*co2.stoech*co2.W/rho)*Q
 
-            all_converg[0] = misc.array_residual(o20, thick, o2.values, thick)
-            all_converg[1] = misc.array_residual(n20, thick, n2.values, thick)
-            all_converg[2] = misc.array_residual(ch40, thick, ch4.values, thick)
-            all_converg[3] = misc.array_residual(h2o0, thick, h2o.values, thick)
-            all_converg[4] = misc.array_residual(co20, thick, co2.values, thick)
+        omega_T = -(o2.Dhf*o2.stoech + n2.Dhf*n2.stoech + ch4.Dhf*ch4.stoech + h2o.Dhf*h2o.stoech + co2.Dhf*co2.stoech)*Q
+        T_field.values = T_field.values + (dtchem/(rho*c_p))*omega_T
+
+        #all_converg[0] = misc.array_residual(o20, thick, o2.values, thick)
+        #all_converg[1] = misc.array_residual(n20, thick, n2.values, thick)
+        #all_converg[2] = misc.array_residual(ch40, thick, ch4.values, thick)
+        #all_converg[3] = misc.array_residual(h2o0, thick, h2o.values, thick)
+        #all_converg[4] = misc.array_residual(co20, thick, co2.values, thick)
 
 
     def progress_rate(self, ch4_field:Methane, o2_field:Dioxygen, T_field:TemperatureField):
         
+        N = self.N
+        thick = self.ghost_thick
+
         ch4_field.update_concentration()
         o2_field.update_concentration()
         ch4_conc = ch4_field.concentration
         o2_conc = o2_field.concentration
 
-        Q = self.A*o2_conc*ch4_conc*np.exp(-self.Ta/T_field)
+        T_arr = T_field.values[thick:-thick, thick:-thick]
+        exp_array = np.zeros((N,N), dtype=float)
+        exp_array[thick:-thick, thick:-thick] = np.where(T_arr >= 100, np.exp(-self.Ta/T_arr), 0.) # Caution to counter from RuntimeWarning: overflow encountered in exp
+        Q = 1.1e8*o2_conc*ch4_conc*exp_array
         
         return Q
     
@@ -275,7 +310,7 @@ class CounterFlowCombustion():
         N = self.N
         physN = self.physN
         dt = self.dt
-        pho = self.pho
+        rho = self.rho
         dx = self.dx
         L_slot = self.L_slot
         L_coflow = self.L_coflow
@@ -298,14 +333,14 @@ class CounterFlowCombustion():
         Press = PressureField(np.full((physN, physN), 1.0), dx, False, thick)
 
         # Initializing the species
-        o2 = Dioxygen(np.full((physN, physN), 0.2, dtype=float), dx, L_slot, L_coflow, pho, False, thick)
-        n2 = Dinitrogen(np.full((physN, physN), 0.8 ,dtype=float), dx, L_slot, L_coflow, pho, False, thick)
-        ch4 = Methane(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, pho, False, thick)
-        h2o = Water(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, pho, False, thick)
-        co2 = CarbonDioxide(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, pho, False, thick)
+        o2 = Dioxygen(np.full((physN, physN), 0.2, dtype=float), dx, L_slot, L_coflow, rho, False, thick)
+        n2 = Dinitrogen(np.full((physN, physN), 0.8 ,dtype=float), dx, L_slot, L_coflow, rho, False, thick)
+        ch4 = Methane(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, rho, False, thick)
+        h2o = Water(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, rho, False, thick)
+        co2 = CarbonDioxide(np.zeros((physN, physN), dtype=float), dx, L_slot, L_coflow, rho, False, thick)
 
         # Initializing the temperature
-        #Temp = TemperatureField(np.full((physN, physN), 298.15), dx, False, thick)
+        Temp = TemperatureField(np.full((physN, physN), 1500), dx, False, thick)
 
         #Initializing the thickness of the diffusive zone.
         diffz_thick = 0.
@@ -343,13 +378,15 @@ class CounterFlowCombustion():
                     misc.plot_field(ch4, True, title=f'CH4 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame)+"_CH4.png")
                     misc.plot_field(h2o, True, title=f'H2O Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame)+"_H2O.png")
                     misc.plot_field(co2, True, title=f'CO2 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame)+"_CO2.png")
+                    misc.plot_field(Temp, True, title=f'T° Field k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(frame)+"_temp_field.png")
                     misc.plot_diffusive_zone(n2, self.y, frame, dt, time)
 
             elif frame%frame_period == frame_period-1 :
                 uvcopy = misc.uv_copy(uv)
 
             # Temperature transport
-
+            #   Temperature constant in time for the moment.
+                
             # Population transport
             self._update_RK2_species(uv, o2)
             self._update_RK2_species(uv, n2)
@@ -357,12 +394,59 @@ class CounterFlowCombustion():
             self._update_RK2_species(uv, h2o)
             self._update_RK2_species(uv, co2)
 
+            # Chemistry, impacting all species populations and temperature.
+            mid_coord = N//2
+            suivitime = [0.]
+            suivio2 = [o2.values[mid_coord, mid_coord]]
+            suivin2 = [n2.values[mid_coord, mid_coord]]
+            suivich4 = [ch4.values[mid_coord, mid_coord]]
+            suivih2o = [h2o.values[mid_coord, mid_coord]]
+            suivico2 = [co2.values[mid_coord, mid_coord]]
+            suiviT = [Temp.values[mid_coord, mid_coord]]
+
+            for dtchem in self.dtchem_list:
+
+                self._converge_all_species(o2, n2, ch4, h2o, co2, Temp, dtchem)
+                if frame%frame_period == 0:
+                    suivitime.append(suivitime[-1]+dtchem)
+                    suivio2.append(o2.values[mid_coord, mid_coord])
+                    suivin2.append(n2.values[mid_coord, mid_coord])
+                    suivich4.append(ch4.values[mid_coord, mid_coord])
+                    suivih2o.append(h2o.values[mid_coord, mid_coord])
+                    suivico2.append(co2.values[mid_coord, mid_coord])
+                    suiviT.append(Temp.values[mid_coord, mid_coord])
+
+            if frame%frame_period == 0:
+                fig1 = plt.figure()
+                plt.plot(suivitime, suivio2, label="O2")
+                plt.plot(suivitime, suivio2, label="O2")
+                plt.plot(suivitime, suivio2, label="O2")
+                plt.plot(suivitime, suivio2, label="O2")
+                plt.plot(suivitime, suivio2, label="O2")
+                plt.xlabel("Time (s)")
+                plt.ylabel("Massic fraction")
+                plt.legend()
+                plt.show()
+
+                fig2 = plt.figure()
+                plt.plot(suivitime, suiviT)
+                plt.xlabel("Time (s)")
+                plt.ylabel("Temperature (K)")
+                plt.show()
+
+            o2.fillGhosts()
+            n2.fillGhosts()
+            ch4.fillGhosts()
+            h2o.fillGhosts()
+            co2.fillGhosts()
+            Temp._fillGhosts()               
+
             # Fluid Flow
             self._update_RK2_velocity(uv, uvet)
             uvet.update_metric()
             self.ell_solver(uvet, Press)
-            uv.u.values = uvet.u.values - (dt/pho)*Press.derivative_x()
-            uv.v.values = uvet.v.values - (dt/pho)*Press.derivative_y()
+            uv.u.values = uvet.u.values - (dt/rho)*Press.derivative_x()
+            uv.v.values = uvet.v.values - (dt/rho)*Press.derivative_y()
             uv._fillGhosts()
             uv.update_metric()
             
@@ -378,6 +462,7 @@ class CounterFlowCombustion():
         misc.plot_field(ch4, True, title=f'CH4 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame)+"_CH4.png")
         misc.plot_field(h2o, True, title=f'H2O Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame)+"_H2O.png")
         misc.plot_field(co2, True, title=f'CO2 Population k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(frame)+"_CO2.png")
+        misc.plot_field(Temp, True, title=f'T° Field k={frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(frame)+"_temp_field.png")
         misc.plot_diffusive_zone(n2, self.y, frame, dt, time)
 
         # About to print and write in final file the report of the simulation.

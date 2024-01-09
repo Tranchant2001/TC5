@@ -28,7 +28,7 @@ D = 15e-6   # Species Diffusion coefficient.
 a = 15e-6   # Temperature Diffusion coefficient.
 L_slot = 5e-4 # length of the inlet slot.
 L_coflow = 5e-4 # length of the inlet coflow.
-pho = 1.1614 # Fluid density.
+rho = 1.1614 # Fluid density.
 Temp_a = 10000 # Temperature in Arhenus' law.
 time_before_ignit = 0.05 # Time before the ignition is triggered in seconds.
 c_p = 1200.
@@ -50,5 +50,5 @@ ell_crit = 2e-4
 div_crit = 100.
 conv_crit = 7e-6
 
-mysimu = CounterFlowCombustion(L, N, L_slot, L_coflow, nu, D, a, pho, Temp_a, time_before_ignit, max_time_computation, show_and_save, register_period, ell_crit, div_crit, conv_crit)
+mysimu = CounterFlowCombustion(L, N, L_slot, L_coflow, nu, D, a, rho, c_p, Temp_a, time_before_ignit, max_time_computation, show_and_save, register_period, ell_crit, div_crit, conv_crit)
 mysimu.compute()
