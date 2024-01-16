@@ -4,11 +4,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 from matplotlib.ticker import FormatStrFormatter
+import matplotlib.dates as mdates
+from matplotlib.ticker import AutoMinorLocator
 
 from velocity_field import VelocityField
 from field import Field
 from species import Dinitrogen
-
 
 
 
@@ -58,7 +59,7 @@ def uv_copy(uv:VelocityField) -> VelocityField:
     return new
 
 
-def velocity_residual(uv0:VelocityField, uv1:VelocityField) -> np.float32:
+def velocity_derivative_norm(uv0:VelocityField, uv1:VelocityField, dt:float) -> np.float32:
     thick0 = uv0.ghost_thick
     u0 = uv0.u.values[thick0:-thick0 , thick0:-thick0]
     v0 = uv0.v.values[thick0:-thick0 , thick0:-thick0]
@@ -67,7 +68,7 @@ def velocity_residual(uv0:VelocityField, uv1:VelocityField) -> np.float32:
     u1 = uv1.u.values[thick1:-thick1 , thick1:-thick1]
     v1 = uv1.v.values[thick1:-thick1 , thick1:-thick1]
 
-    return np.mean(np.sqrt((u0 - u1)**2 + (v0 - v1)**2))
+    return np.mean(np.sqrt( ((u0 - u1)/dt)**2 + ((v0 - v1)/dt)**2))
 
 
 def array_residual(f0:np.ndarray, thick0:int, f1:np.ndarray, thick1:int) -> np.float32:
@@ -217,3 +218,48 @@ def print_write_end_message(code, div_crit, max_t_comput, conv_crit, L, D, N, dt
 
     endfile = open(dirpath+"/outputs_program_ecoulement/simulation_report.txt", "w")
     endfile.write(message)
+
+
+def plot_chemistry(suivi_time, suivi_o2, suivi_n2, suivi_ch4, suivi_h2o, suivi_co2, suivi_T, x, y, frame):
+
+    fig1, ax1 = plt.subplots()
+    ax1.clear()
+    ax1.set_xlabel('Time (s)')
+    ax1.set_ylabel('Massic fraction')
+    ax1.plot(suivi_time, suivi_o2, label="O2", linestyle="-", marker=".")
+    ax1.plot(suivi_time, suivi_n2, label="N2", linestyle="-", marker=".")
+    ax1.plot(suivi_time, suivi_ch4, label="CH4", linestyle="-", marker=".")
+    ax1.plot(suivi_time, suivi_h2o, label="H2O", linestyle="-", marker=".")
+    ax1.plot(suivi_time, suivi_co2, label="CO2", linestyle="-", marker=".")
+    plt.legend()
+    savename1 = f"{frame}_x{x}y{y}_species.png"
+    plt.savefig(dirpath+"/outputs_program_ecoulement/"+savename1, dpi=108, bbox_inches="tight")
+    plt.close(fig1)
+
+    fig2 = plt.figure()
+    plt.plot(suivi_time, suivi_T, linestyle="-", marker=".")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Temperature (K)")
+    savename2 = f"{frame}_x{x}y{y}_temperature.png"
+    plt.savefig(dirpath+"/outputs_program_ecoulement/"+savename2, dpi=108, bbox_inches="tight")
+    plt.close(fig2)
+
+
+def plot_consecutive_deriv(analysis_array:np.ndarray, **kwargs):
+
+    fig, ax1 = plt.subplots(layout="constrained")
+
+    frame_arr = analysis_array[0,:]
+    data_arr = analysis_array[2,:]
+
+    ax1.semilogy(frame_arr, data_arr)
+    ax1.set_xlabel("Frame index")
+    ax1.set_ylabel("Consecutive Velocity difference")
+    if 'title' in kwargs.keys():
+        ax1.set_title(kwargs.get('title'))
+
+    if 'saveaspng' in kwargs.keys():
+        plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+    if 'pause' in kwargs.keys():
+        plt.pause(kwargs.get('pause'))
+    plt.close(fig)

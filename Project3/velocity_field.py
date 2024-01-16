@@ -157,6 +157,10 @@ class VelocityField():
 
 
     def update_metric(self):
+        # Processes the norm array and store it in the attribute 'norm' as a Field class.
+        # Processes the relative standard deviation of the norm array and store it in the attribute 'metric'.
+        # Processes the 1D array of the strain rate on the left wall and store it in the attribute 'strain_rate' as a 1D numpy.ndarray.
+        # Processes the float value of the maximum strain rate on the left wall and store it in the attribute 'max_strain_rate' as a float.
         
         u = np.copy(self.u.values)
         v = np.copy(self.v.values)
@@ -181,7 +185,6 @@ class VelocityField():
 
         else:
             self.metric = std / mean
-
 
         # Process the strain rate on the slipping wall:
         slipping_wall_v = self.v.values[:, thick]

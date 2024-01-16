@@ -1,0 +1,7 @@
+Success: The simulation stopped running because the velocity field was stable enough (uv_consecutive_deriv < 1.38e+00).
+	Parameters: (L, nu, N, $\Delta t$)=(0.002, 1.5e-05, 28, 1.6666666666666667e-05)
+	Simulation duration: 0:00:02.556024
+	Virtual stop time: 0.006716666666666667 s
+	Virtual stop frame: 404
+	Velocity consecutive derivative: 1.22e+00
+	Maximum strain rate on the left wall: 1484.3624267578125 Hz

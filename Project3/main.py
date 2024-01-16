@@ -18,6 +18,7 @@ Propagating the Fluid flow in the chamber.
 
 import datetime
 from counter_flow_combustion import CounterFlowCombustion
+from fluid_flow import FluidFlow
 
 
 
@@ -35,20 +36,23 @@ c_p = 1200.
 
 
 # Initial Parameters of the simulation
-N = 45 # Number of steps for each space axis
+physN = 45 # Number of steps for each space axis. "Physical N" in opposition with the size accounting for ghost cells which is N.
 
 
 # Put here the maximum time you want to spend on the computation.
 max_time_computation = datetime.timedelta(hours=1, minutes=0)
 # Show and register plots ?
 show_and_save = True
-register_period = 10000
+register_period = 1
+# Coordinates of the pixel to observe to check chemistry well functioning.
+x_reactor = 0 # Enter the coordinate, not accounting for ghost cells.
+y_reactor = 0
 
 # Stop threshold of elliptic solver
 ell_crit = 2e-4
 # Divergence stop cirterion
-div_crit = 100.
+div_crit = 1e6
 conv_crit = 7e-6
 
-mysimu = CounterFlowCombustion(L, N, L_slot, L_coflow, nu, D, a, rho, c_p, Temp_a, time_before_ignit, max_time_computation, show_and_save, register_period, ell_crit, div_crit, conv_crit)
+mysimu = CounterFlowCombustion(L, physN, L_slot, L_coflow, nu, D, a, rho, c_p, Temp_a, time_before_ignit, max_time_computation, show_and_save, register_period, x_reactor, y_reactor, ell_crit, div_crit, conv_crit)
 mysimu.compute()

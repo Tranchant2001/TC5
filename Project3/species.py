@@ -9,7 +9,7 @@ from velocity_field import VelocityField
 
 class Species(Field):
 
-    def __init__(self, array: np.ndarray, dx: float, L_slot:float, L_coflow:float, W:float, Dhf:float, stoech:int, pho:float, symbol:str, got_ghost_cells=False, ghost_thick=0):
+    def __init__(self, array: np.ndarray, dx: float, L_slot:float, L_coflow:float, W:float, Dhf:float, stoech:int, rho:float, symbol:str, got_ghost_cells=False, ghost_thick=0):
         
         super().__init__(array, dx, got_ghost_cells, ghost_thick)
 
@@ -20,7 +20,7 @@ class Species(Field):
         self.W = W # Molar mass in kg/mol.
         self.Dhf = Dhf # Entalpy of formation in J/mol.
         self.stoech = stoech
-        self.pho = pho
+        self.rho = rho
         self.symbol = symbol
 
         self.reaction_rate = np.full((array.shape[0], array.shape[0]), 666.0) # Initial weird values
@@ -42,7 +42,7 @@ class Species(Field):
 
     def update_concentration(self):
         
-        concentration_arr = self.pho*self.values/self.W
+        concentration_arr = (self.rho/self.W)*self.values
         
         if self.got_ghost_cells:
             thick = self.ghost_thick
@@ -59,9 +59,9 @@ class Dioxygen(Species):
 
     #__slots__ = "values", "dx", "L_slot", "L_coflow", "got_ghost_cells", "ghost_thick"
 
-    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, got_ghost_cells=False, ghost_thick=0):
+    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, rho:float, got_ghost_cells=False, ghost_thick=0):
 
-        super().__init__(array, dx, L_slot, L_coflow, 31.999e-3, 0., -2, pho, "O_{2}", got_ghost_cells, ghost_thick)
+        super().__init__(array, dx, L_slot, L_coflow, 31.999e-3, 0., -2, rho, "O_{2}", got_ghost_cells, ghost_thick)
 
         assert(array.shape[0] == array.shape[1])
 
@@ -122,9 +122,9 @@ class Dinitrogen(Species):
 
     #__slots__ = "values", "dx", "L_slot", "L_coflow", "got_ghost_cells", "ghost_thick"
 
-    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, got_ghost_cells=False, ghost_thick=0):
+    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, rho:float, got_ghost_cells=False, ghost_thick=0):
 
-        super().__init__(array, dx, L_slot, L_coflow, 28.01e-3, 0., 0, pho, "N_{2}", got_ghost_cells, ghost_thick)
+        super().__init__(array, dx, L_slot, L_coflow, 28.01e-3, 0., 0, rho, "N_{2}", got_ghost_cells, ghost_thick)
 
         assert(array.shape[0] == array.shape[1])
         
@@ -188,9 +188,9 @@ class Methane(Species):
 
     #__slots__ = "values", "dx", "L_slot", "L_coflow", "got_ghost_cells", "ghost_thick"
 
-    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, got_ghost_cells=False, ghost_thick=0):
+    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, rho:float, got_ghost_cells=False, ghost_thick=0):
 
-        super().__init__(array, dx, L_slot, L_coflow, 16.04e-3, -74900, -1, pho, "CH_{4}", got_ghost_cells, ghost_thick)
+        super().__init__(array, dx, L_slot, L_coflow, 16.04e-3, -74900, -1, rho, "CH_{4}", got_ghost_cells, ghost_thick)
 
         assert(array.shape[0] == array.shape[1])
         
@@ -251,9 +251,9 @@ class Water(Species):
 
     #__slots__ = "values", "dx", "L_slot", "L_coflow", "got_ghost_cells", "ghost_thick"
 
-    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, got_ghost_cells=False, ghost_thick=0):
+    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, rho:float, got_ghost_cells=False, ghost_thick=0):
 
-        super().__init__(array, dx, L_slot, L_coflow, 18.01528e-3, -241818, 2, pho, "H_{2}O", got_ghost_cells, ghost_thick)
+        super().__init__(array, dx, L_slot, L_coflow, 18.01528e-3, -241818, 2, rho, "H_{2}O", got_ghost_cells, ghost_thick)
 
         assert(array.shape[0] == array.shape[1])
         
@@ -314,9 +314,9 @@ class CarbonDioxide(Species):
 
     #__slots__ = "values", "dx", "L_slot", "L_coflow", "got_ghost_cells", "ghost_thick"
 
-    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, pho:float, got_ghost_cells=False, ghost_thick=0):
+    def __init__(self, array:np.ndarray, dx:float, L_slot:float, L_coflow:float, rho:float, got_ghost_cells=False, ghost_thick=0):
 
-        super().__init__(array, dx, L_slot, L_coflow, 44.01e-3, -393520, 1, pho, "CO_{2}", got_ghost_cells, ghost_thick)
+        super().__init__(array, dx, L_slot, L_coflow, 44.01e-3, -393520, 1, rho, "CO_{2}", got_ghost_cells, ghost_thick)
 
         assert(array.shape[0] == array.shape[1])
         
