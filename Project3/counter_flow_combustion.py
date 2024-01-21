@@ -537,7 +537,7 @@ class CounterFlowCombustion():
                 self.chem_frame += 1
 
             if self.frame%frame_period == 0:
-                misc.plot_chemistry(suivitime, suivio2, suivin2, suivich4, suivih2o, suivico2, suiviT, i_reactor, j_reactor, self.frame)
+                misc.plot_chemistry(suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT, i_reactor, j_reactor, self.frame)
 
             o2.fillGhosts()
             n2.fillGhosts()

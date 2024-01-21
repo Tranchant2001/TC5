@@ -222,14 +222,13 @@ def print_write_end_message(code, div_crit, max_t_comput, conv_crit, L, D, N, dt
     endfile.write(message)
 
 
-def plot_chemistry(suivi_time, suivi_o2, suivi_n2, suivi_ch4, suivi_h2o, suivi_co2, suivi_T, i, j, frame):
+def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_T, i, j, frame):
 
     fig1, ax1 = plt.subplots()
     ax1.clear()
     ax1.set_xlabel('Time (s)')
     ax1.set_ylabel('Massic fraction')
     ax1.plot(suivi_time, suivi_o2, label="O2", linestyle="-", marker=".")
-    ax1.plot(suivi_time, suivi_n2, label="N2", linestyle="-", marker=".")
     ax1.plot(suivi_time, suivi_ch4, label="CH4", linestyle="-", marker=".")
     ax1.plot(suivi_time, suivi_h2o, label="H2O", linestyle="-", marker=".")
     ax1.plot(suivi_time, suivi_co2, label="CO2", linestyle="-", marker=".")
