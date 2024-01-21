@@ -43,10 +43,10 @@ physN = 45 # Number of steps for each space axis. "Physical N" in opposition wit
 max_time_computation = datetime.timedelta(hours=1, minutes=0)
 # Show and register plots ?
 show_and_save = True
-register_period = 1
+register_period = 15
 # Coordinates of the pixel to observe to check chemistry well functioning.
-x_reactor = 0 # Enter the coordinate, not accounting for ghost cells.
-y_reactor = 0
+i_reactor = 0 # Enter the coordinate, not accounting for ghost cells.
+j_reactor = 3
 
 # Stop threshold of elliptic solver
 ell_crit = 2e-4
@@ -54,5 +54,5 @@ ell_crit = 2e-4
 div_crit = 1e6
 conv_crit = 7e-6
 
-mysimu = CounterFlowCombustion(L, physN, L_slot, L_coflow, nu, D, a, rho, c_p, Temp_a, time_before_ignit, max_time_computation, show_and_save, register_period, x_reactor, y_reactor, ell_crit, div_crit, conv_crit)
+mysimu = CounterFlowCombustion(L, physN, L_slot, L_coflow, nu, D, a, rho, c_p, Temp_a, time_before_ignit, max_time_computation, show_and_save, register_period, i_reactor, j_reactor, ell_crit, div_crit, conv_crit)
 mysimu.compute()

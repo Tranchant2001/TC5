@@ -10,6 +10,8 @@ from matplotlib.ticker import AutoMinorLocator
 from velocity_field import VelocityField
 from field import Field
 from species import Dinitrogen
+from species import Dioxygen
+from temperature_field import TemperatureField
 
 
 
@@ -220,7 +222,7 @@ def print_write_end_message(code, div_crit, max_t_comput, conv_crit, L, D, N, dt
     endfile.write(message)
 
 
-def plot_chemistry(suivi_time, suivi_o2, suivi_n2, suivi_ch4, suivi_h2o, suivi_co2, suivi_T, x, y, frame):
+def plot_chemistry(suivi_time, suivi_o2, suivi_n2, suivi_ch4, suivi_h2o, suivi_co2, suivi_T, i, j, frame):
 
     fig1, ax1 = plt.subplots()
     ax1.clear()
@@ -232,7 +234,7 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_n2, suivi_ch4, suivi_h2o, suivi_c
     ax1.plot(suivi_time, suivi_h2o, label="H2O", linestyle="-", marker=".")
     ax1.plot(suivi_time, suivi_co2, label="CO2", linestyle="-", marker=".")
     plt.legend()
-    savename1 = f"{frame}_x{x}y{y}_species.png"
+    savename1 = f"{frame}_i{i}j{j}_species.png"
     plt.savefig(dirpath+"/outputs_program_ecoulement/"+savename1, dpi=108, bbox_inches="tight")
     plt.close(fig1)
 
@@ -240,8 +242,29 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_n2, suivi_ch4, suivi_h2o, suivi_c
     plt.plot(suivi_time, suivi_T, linestyle="-", marker=".")
     plt.xlabel("Time (s)")
     plt.ylabel("Temperature (K)")
-    savename2 = f"{frame}_x{x}y{y}_temperature.png"
+    savename2 = f"{frame}_i{i}j{j}_temperature.png"
     plt.savefig(dirpath+"/outputs_program_ecoulement/"+savename2, dpi=108, bbox_inches="tight")
+    plt.close(fig2)
+
+    fig3, ax3 = plt.subplots()
+    ax3.clear()
+    ax3.set_xlabel('Time (s)')
+    ax3.set_ylabel('Absolute massic fraction derivative (/s)')
+    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_o2, suivi_time))  , label="dO2/dt",   linestyle="-", marker=".")
+    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_ch4, suivi_time)) , label="dCH4/dt",  linestyle="-", marker=".")
+    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_h2o, suivi_time)) , label="dH2O/dt",  linestyle="-", marker=".")
+    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_co2, suivi_time)) , label="dCO2/dt",  linestyle="-", marker=".")
+    plt.legend()
+    savename3 = f"{frame}_i{i}j{j}_species_deriv.png"
+    plt.savefig(dirpath+"/outputs_program_ecoulement/"+savename3, dpi=108, bbox_inches="tight")
+    plt.close(fig3)
+
+    fig4 = plt.figure()
+    plt.semilogy(suivi_time, np.abs(np.gradient(suivi_T, suivi_time)), linestyle="-", marker=".")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Absolute temperature derivative (K/s)")
+    savename4 = f"{frame}_i{i}j{j}_temperature_deriv.png"
+    plt.savefig(dirpath+"/outputs_program_ecoulement/"+savename4, dpi=108, bbox_inches="tight")
     plt.close(fig2)
 
 
@@ -263,3 +286,52 @@ def plot_consecutive_deriv(analysis_array:np.ndarray, **kwargs):
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get('pause'))
     plt.close(fig)
+
+
+def plot_array(array, **kwargs):
+
+    """
+    Plot the state of the scalar field.
+    Specifies in the title the time and the metric
+    """
+
+    # Create a figure and axis for the animation
+    fig, ax = plt.subplots()
+    
+    # Plot the scalar field
+    ax.clear()
+    ax.set_xlabel('Column index')
+    ax.set_ylabel('Row index')
+    if 'title' in kwargs.keys():
+        ax.set_title(kwargs.get('title'))
+
+    image = ax.imshow(array, origin='lower', cmap='viridis')
+    fig.colorbar(image, ax=ax)
+    if 'saveaspng' in kwargs.keys():
+        plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+    if 'pause' in kwargs.keys():
+        plt.show()
+        plt.pause(kwargs.get("pause"))
+    plt.close(fig)
+
+
+def worth_continue_chemistry(o2_0:np.ndarray, o2_1:np.ndarray, T_0:np.ndarray, T_1:np.ndarray, thick:int, dt:float):
+    
+    o2_0 = o2_0[thick:-thick , thick:-thick]
+    o2_1 = o2_1[thick:-thick , thick:-thick]
+    T_0 = T_0[thick:-thick , thick:-thick]
+    T_1 = T_1[thick:-thick , thick:-thick]
+
+    max_derive_o2 = np.max(np.abs((o2_1 - o2_0)/dt))
+    max_deriv_T = np.max(np.abs((T_1 - T_0)/dt))
+
+    return (max_derive_o2 > 50. or max_deriv_T > 5e5)
+
+
+def two_arrays_derivative(arr0:np.ndarray, arr1:np.ndarray, dt:float) -> np.float32:
+    pass
+
+def register_array_csv(filename:str, arr:np.ndarray):
+
+    np.savetxt(dirpath+"/outputs_program_ecoulement/"+filename, arr, delimiter="\t", fmt="%.3e")
+
