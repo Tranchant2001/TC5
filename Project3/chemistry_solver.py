@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import datetime
 import math
 from numba import njit
+import datetime
 
 from field import Field
 from velocity_field import VelocityField
@@ -21,8 +22,63 @@ fullpath = os.path.abspath(__file__)
 dirpath = os.path.dirname(fullpath)
 
 @njit
-def numba_RK2(physN:int, dtchemlist:np.ndarray, o2_arr:np.ndarray, W_o2, st_o2, Dhf_o2, ch4_arr:np.ndarray, W_ch4, st_ch4, Dhf_ch4, h2o_arr:np.ndarray, W_h2o, st_h2o, Dhf_h2o, co2_arr:np.ndarray, W_co2, st_co2, Dhf_co2, Temp_arr:np.ndarray, Ta, rho, c_p, i_reactor, j_reactor, suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT):
+def numba_RK2(physN:int, dtchemlist:np.ndarray, o2_arr:np.ndarray, W_o2, st_o2, Dhf_o2, ch4_arr:np.ndarray, W_ch4, st_ch4, Dhf_ch4, h2o_arr:np.ndarray, W_h2o, st_h2o, Dhf_h2o, co2_arr:np.ndarray, W_co2, st_co2, Dhf_co2, Temp_arr:np.ndarray, Ta, rho, c_p, i_reactor, j_reactor, thick:int, zero_th:float, suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT):
     
+    nchem = dtchemlist.shape[0]
+
+    for i in range(physN):
+        for j in range(physN):
+            if i == i_reactor-thick and j == j_reactor-thick:
+                nothing = True
+            isworth = True
+            frame_chem = 0
+            o20 = o2_arr[i,j]
+            ch40 = ch4_arr[i,j]
+            h2o0 = h2o_arr[i,j]
+            co20 = co2_arr[i,j]
+            Temp0 = Temp_arr[i,j]
+            while frame_chem < nchem and isworth:
+                
+                dtchem = dtchemlist[frame_chem]
+                
+                if bool(np.isnan(o2_arr[i,j])) or bool(np.isnan(ch4_arr[i,j])):
+                    pass 
+
+                Q = numba_progress_rate(o2_arr[i,j], W_o2, ch4_arr[i,j], W_ch4, Temp_arr[i,j], Ta, rho, zero_th)
+                #print(o2_arr[i,j])
+                o2_arr[i,j] = o20 + (0.5*dtchem*st_o2*W_o2/rho)*Q
+                #print(o2_arr[i,j])
+                ch4_arr[i,j] = ch40 + (0.5*dtchem*st_ch4*W_ch4/rho)*Q
+                Temp_arr[i,j] = Temp0 - (0.5*dtchem/(rho*c_p))*(st_ch4*Dhf_ch4 + st_co2*Dhf_co2 + st_h2o*Dhf_h2o)*Q
+
+                Q = numba_progress_rate(o2_arr[i,j], W_o2, ch4_arr[i,j], W_ch4, Temp_arr[i,j], Ta, rho, zero_th)
+                o2_arr[i,j] = o20 + (dtchem*st_o2*W_o2/rho)*Q
+                ch4_arr[i,j] = ch40 + (dtchem*st_ch4*W_ch4/rho)*Q
+                h2o_arr[i,j] = h2o0 + (dtchem*st_h2o*W_h2o/rho)*Q
+                co2_arr[i,j] = co20 + (dtchem*st_co2*W_co2/rho)*Q
+                Temp_arr[i,j] = Temp0 - (dtchem/(rho*c_p))*(st_ch4*Dhf_ch4 + st_co2*Dhf_co2 + st_h2o*Dhf_h2o)*Q
+
+                isworth = is_worth_continue(o20, o2_arr[i,j], Temp0, Temp_arr[i,j], dtchem)
+
+                o20 = o2_arr[i,j]
+                ch40 = ch4_arr[i,j]
+                h2o0 = h2o_arr[i,j]
+                co20 = co2_arr[i,j]
+                Temp0 = Temp_arr[i,j]
+
+                if i == i_reactor-thick and j == j_reactor-thick:
+                    suivitime[frame_chem+1] = suivitime[frame_chem]+dtchem
+                    suivio2[frame_chem+1] = o20
+                    suivich4[frame_chem+1] = ch40
+                    suivih2o[frame_chem+1] = h2o0
+                    suivico2[frame_chem+1] = co20
+                    suiviT[frame_chem+1] = Temp0
+
+                frame_chem += 1
+
+@njit
+def numba_Linearized_Trapezoidal(physN:int, dtchemlist:np.ndarray, o2_arr:np.ndarray, W_o2, st_o2, Dhf_o2, ch4_arr:np.ndarray, W_ch4, st_ch4, Dhf_ch4, h2o_arr:np.ndarray, W_h2o, st_h2o, Dhf_h2o, co2_arr:np.ndarray, W_co2, st_co2, Dhf_co2, Temp_arr:np.ndarray, Ta, rho, c_p, i_reactor, j_reactor, suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT):
+
     nchem = dtchemlist.shape[0]
 
     for i in range(physN):
@@ -39,7 +95,9 @@ def numba_RK2(physN:int, dtchemlist:np.ndarray, o2_arr:np.ndarray, W_o2, st_o2, 
                 dtchem = dtchemlist[frame_chem]
 
                 Q = numba_progress_rate(o2_arr[i,j], W_o2, ch4_arr[i,j], W_ch4, Temp_arr[i,j], Ta, rho)
+                #print(o2_arr[i,j])
                 o2_arr[i,j] = o20 + (0.5*dtchem*st_o2*W_o2/rho)*Q
+                #print(o2_arr[i,j])
                 ch4_arr[i,j] = ch40 + (0.5*dtchem*st_ch4*W_ch4/rho)*Q
                 Temp_arr[i,j] = Temp0 - (0.5*dtchem/(rho*c_p))*(st_ch4*Dhf_ch4 + st_co2*Dhf_co2 + st_h2o*Dhf_h2o)*Q
 
@@ -66,16 +124,21 @@ def numba_RK2(physN:int, dtchemlist:np.ndarray, o2_arr:np.ndarray, W_o2, st_o2, 
                     suivico2[frame_chem+1] = co20
                     suiviT[frame_chem+1] = Temp0
 
+                frame_chem += 1
 
 @njit
-def numba_progress_rate(o2_val, W_o2, ch4_val, W_ch4, T_val, Ta, rho):
+def numba_progress_rate(o2_val, W_o2, ch4_val, W_ch4, T_val, Ta, rho, zero_th:float):
 
         A = 1.1e8
 
         ch4_conc = (rho/W_ch4)*ch4_val
         o2_conc = (rho/W_o2)*o2_val
 
-        Q = A*(o2_conc**2)*ch4_conc*np.exp(-Ta/T_val)
+        Q = 0.
+
+        if o2_conc > zero_th:
+
+            Q = A*(o2_conc**2)*ch4_conc*np.exp(-Ta/T_val)
 
         return Q
 
@@ -125,10 +188,14 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_
     plt.close(fig2)
 
 
-def chemistry_loop(o2:Dioxygen, ch4:Methane, h2o:Water,co2:CarbonDioxide, Temp:TemperatureField, frame:int, dtchemlist, rho, c_p, Ta:float, i_reactor, j_reactor, showAndSave):
+def chemistry_loop(o2:Dioxygen, ch4:Methane, h2o:Water,co2:CarbonDioxide, Temp:TemperatureField, L:float, frame:int, dtchemlist, rho, c_p, Ta:float, i_reactor, j_reactor, showAndSave):
     
     thick = o2.ghost_thick
     physN = o2.N - 2*thick
+
+    dx = L/(physN-1)
+    Na = 6.0221408e+23
+    zero_threshold = 1/(Na*dx**3)
 
     nchem = dtchemlist.shape[0]
 
@@ -146,13 +213,20 @@ def chemistry_loop(o2:Dioxygen, ch4:Methane, h2o:Water,co2:CarbonDioxide, Temp:T
     suiviT = np.full(nchem+1, -1.0)
 
     suivitime[0] = 0.
+    # Les indices i_reactor et j_reactor prennent en compte la taille des ghost_cells. Donc ici pas besoin de retirer thick.
     suivio2[0] = o2.values[i_reactor, j_reactor]
     suivich4[0] = ch4.values[i_reactor, j_reactor]
     suivih2o[0] = h2o.values[i_reactor, j_reactor]
     suivico2[0] = co2.values[i_reactor, j_reactor]
     suiviT[0] = Temp.values[i_reactor, j_reactor]
 
-    numba_RK2(physN, dtchemlist, o2_arr, o2.W, o2.stoech, o2.Dhf, ch4_arr, ch4.W, ch4.stoech, ch4.Dhf, h2o_arr, h2o.W, h2o.stoech, h2o.stoech, co2_arr, co2.W, co2.stoech, co2.Dhf, Temp_arr, Ta, rho, c_p, i_reactor, j_reactor, suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT)
+    numba_RK2(physN, dtchemlist, o2_arr, o2.W, o2.stoech, o2.Dhf, ch4_arr, ch4.W, ch4.stoech, ch4.Dhf, h2o_arr, h2o.W, h2o.stoech, h2o.Dhf, co2_arr, co2.W, co2.stoech, co2.Dhf, Temp_arr, Ta, rho, c_p, i_reactor, j_reactor, thick, zero_threshold,suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT)
+
+    o2.values[thick:-thick,thick:-thick]    =   o2_arr
+    ch4.values[thick:-thick,thick:-thick]   =   ch4_arr
+    h2o.values[thick:-thick,thick:-thick]   =   h2o_arr
+    co2.values[thick:-thick,thick:-thick]   =   co2_arr
+    Temp.values[thick:-thick,thick:-thick]  =   Temp_arr
 
     if showAndSave:
         suivitime = np.delete(suivitime, np.argwhere(suivitime == -1.0))
@@ -199,6 +273,7 @@ def test():
     max_Fo = 0.25 # Fourier threshold in 2D
     max_CFL = 0.5 # CFL limit thresholf in 2D
     dt = 0.4*min(max_Fo*(dx**2)/D, max_CFL*dx/max_u)   # Time step
+    print(dt)
     dtchemlist = set_dtchem_list(dt)
 
     # Initializing the species
@@ -217,9 +292,25 @@ def test():
     i_reactor = 22
     j_reactor = 0
 
-    chemistry_loop(o2, ch4, h2o, co2, Temp, frame, dtchemlist, rho, c_p, Ta, i_reactor, j_reactor, True)
+    # Initial Picture
+    misc.plot_field(o2, True, title=f'O2 Population k=0 ($\Delta t=${dt})', saveaspng="0_O2.png")
+    misc.plot_field(ch4, True, title=f'CH4 Population k=0 ($\Delta t=${dt})', saveaspng="0_CH4.png")
+    misc.plot_field(h2o, True, title=f'H2O Population k=0 ($\Delta t=${dt})', saveaspng="0_H2O.png")
+    misc.plot_field(co2, True, title=f'CO2 Population k=0 ($\Delta t=${dt})', saveaspng="0_CO2.png")
+    misc.plot_field(Temp, True, title=f'T° Field k=0 ($\Delta t=${dt})',saveaspng="0_temp_field.png")
 
+    start_datetime = datetime.datetime.now()
+    
+    chemistry_loop(o2, ch4, h2o, co2, Temp, L, frame, dtchemlist, rho, c_p, Ta, i_reactor, j_reactor, True)
 
-test()
+    stop_datetime = datetime.datetime.now()
 
+    print(stop_datetime - start_datetime)
+
+    # Final Picture
+    misc.plot_field(o2, True, title=f'O2 Population k=0 ($\Delta t=${dt})', saveaspng="1_O2.png")
+    misc.plot_field(ch4, True, title=f'CH4 Population k=0 ($\Delta t=${dt})', saveaspng="1_CH4.png")
+    misc.plot_field(h2o, True, title=f'H2O Population k=0 ($\Delta t=${dt})', saveaspng="1_H2O.png")
+    misc.plot_field(co2, True, title=f'CO2 Population k=0 ($\Delta t=${dt})', saveaspng="1_CO2.png")
+    misc.plot_field(Temp, True, title=f'T° Field k=0 ($\Delta t=${dt})',saveaspng="1_temp_field.png")
 

@@ -5,12 +5,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 import datetime
 import math
+
 from field import Field
 from velocity_field import VelocityField
 from pressure_field import PressureField
 from species import Species, Dioxygen, Dinitrogen, Methane, Water, CarbonDioxide
 from temperature_field import TemperatureField
 import misc
+import chemistry_solver
 
 
 
@@ -68,29 +70,9 @@ class CounterFlowCombustion():
 
     def set_dtchem_list(self, dt):
         
-        number = 12
-        l0 = np.linspace(-4.4, 0, number, endpoint=True)
-        l1 = 10**l0
-        l3 = l1*dt
-        l4 = [l3[0]]
-        acc_time = l3[0]
-        for k in range(1, number):
-            dttemp = min(l3[k] - l3[k-1], dt*0.1)
-            l4.append(dttemp)
-            acc_time += dttemp
-
-        n_r = int((dt - acc_time)/(dt*0.1))
-        l4 = l4 + [dt*0.1]*n_r
-        acc_time += n_r*dt*0.1
-        l4.append(dt-acc_time)
-
-        l5 = np.array(l4, dtype=float)
-        l6 = np.zeros(l5.shape[0], dtype=float)
-        l6[0] = l5[0]
-        for k in range(1, l5.shape[0]):
-            l6[k] = l5[k] + l6[k-1]
-
-        l4 = np.full(800, dt/800)
+        identified_stable_dt = 2e-8 # in seconds
+        nsteps = int(dt/identified_stable_dt)
+        l4 = np.full(nsteps, identified_stable_dt, dtype=float)
 
         #fig1 = plt.figure()
         #plt.plot(l6, label="Time piled up")
@@ -136,11 +118,11 @@ class CounterFlowCombustion():
     
         eps = 1.
         kiter = 1
-        maxiter = 999
-        while eps > self.ell_crit and kiter < maxiter:
-            if kiter%1002==1000:
-                print(f"\tElliptic Solver\ti={kiter}")
-                misc.plot_field(P, title=f"Elliptic solver\nIter={kiter}\nresidual err={eps:.3f}\n $\omega={omega}$", saveaspng=f"{kiter}_pressure_convergance.png", pause=2)
+        warningiter = 1500
+        while eps > self.ell_crit and kiter < warningiter*3:
+            if kiter%warningiter == warningiter-1:
+                print(f"\tWarning: Elliptic Solver has reached more than {kiter}\t iterations !")
+                misc.plot_field(P, title=f"Elliptic solver\nIter={kiter}\nresidual err={eps:.3e}\n $\omega={omega}$", saveaspng=f"{kiter}_pressure_convergance.png", pause=2)
             # Realizes a backward and then a forward SOR to symmetrizes error.
             P.update_forward_SOR(beta_arr, omega)
             P.update_backward_SOR(beta_arr, omega)
@@ -208,8 +190,8 @@ class CounterFlowCombustion():
         uvet.u.values = u0 + 0.5*self.dt*self._f_velocities(u0, v0, u0)
         uvet.v.values = v0 + 0.5*self.dt*self._f_velocities(u0, v0, v0)
         uvet._fillGhosts()
-        misc.plot_field(uvet.v, True, title=f'V* Field',saveaspng="_v-et00_field.png")
-        misc.plot_field(uvet.u, True, title=f'U* Field',saveaspng="_u-et00_field.png")            
+        #misc.plot_field(uvet.v, True, title=f'V* Field',saveaspng="_v-et00_field.png")
+        #misc.plot_field(uvet.u, True, title=f'U* Field',saveaspng="_u-et00_field.png")            
 
  
         u12 = np.copy(uvet.u.values)
@@ -218,8 +200,8 @@ class CounterFlowCombustion():
         uvet.u.values = u0 + self.dt*self._f_velocities(u12, v12, u12)
         uvet.v.values = v0 + self.dt*self._f_velocities(u12, v12, v12)
         uvet._fillGhosts()
-        misc.plot_field(uvet.v, True, title=f'V* Field',saveaspng="_v-et01_field.png")
-        misc.plot_field(uvet.u, True, title=f'U* Field',saveaspng="_u-et01_field.png")            
+        #misc.plot_field(uvet.v, True, title=f'V* Field',saveaspng="_v-et01_field.png")
+        #misc.plot_field(uvet.u, True, title=f'U* Field',saveaspng="_u-et01_field.png")            
 
 
     def _f_species(self, uval, vval, phi):
@@ -428,7 +410,7 @@ class CounterFlowCombustion():
 
         # Initalize uvcopy
         uvcopy = VelocityField(np.zeros((physN, physN), dtype=float), np.zeros((physN, physN), dtype=float) , dx, L_slot, L_coflow, False, thick)
-        uv_consecutive_diff = 1.0
+        uv_consecutive_diff = 1000.
 
         # Initializing the V* field
         uvet = VelocityField(np.zeros((physN, physN), dtype=float), np.zeros((physN, physN), dtype=float) , dx, L_slot, L_coflow, False, thick)
@@ -447,21 +429,22 @@ class CounterFlowCombustion():
         # Initializing the temperature
         Temp = TemperatureField(np.full((physN, physN), 300), dx, False, thick)
 
-        #Initializing the thickness of the diffusive zone.
-        diffz_thick = 0.
-
         # Set time to zero
         time = 0.
         
         start_datetime = datetime.datetime.now()
         stop_datetime = datetime.datetime.now()
 
+        # Settings
+        hasIgnitionStarted = False
 
         while uv_consecutive_diff >= self.conv_crit and uv.metric < self.div_crit and stop_datetime - start_datetime < self.max_t_comput:
             
             time = self.frame * dt
 
-            if self.frame%frame_period == 0:
+            isDisplayFrame = (self.frame%frame_period == 0)
+
+            if isDisplayFrame:
                 
                 if self.frame != 0:
                     uv_consecutive_diff = misc.velocity_derivative_norm(uvcopy, uv, dt)
@@ -471,73 +454,59 @@ class CounterFlowCombustion():
 
                 if self.show_save:
                     misc.register_array_csv(f"{self.frame}_ch4.csv", ch4.values)
-                    misc.plot_field(uv.v, True, title=f'V Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_v_field.png")
-                    misc.plot_field(uv.u, True, title=f'U Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_u_field.png")
-                    misc.plot_field(uvet.v, True, title=f'V* Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_v-et_field.png")
-                    misc.plot_field(uvet.u, True, title=f'U* Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_u-et_field.png")
-                    misc.plot_strain_rate(uv, self.y, title="Spatial representation of th strain rate along the slipping wall", saveaspng=str(self.frame)+"_strain_rate.png")
-                    misc.plot_field(Press, True, title=f'Pressure Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_press_field.png")
+                    #misc.plot_field(uv.v, True, title=f'V Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_v_field.png")
+                    #misc.plot_field(uv.u, True, title=f'U Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_u_field.png")
+                    #misc.plot_field(uvet.v, True, title=f'V* Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_v-et_field.png")
+                    #misc.plot_field(uvet.u, True, title=f'U* Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_u-et_field.png")
+                    #misc.plot_strain_rate(uv, self.y, title="Spatial representation of th strain rate along the slipping wall", saveaspng=str(self.frame)+"_strain_rate.png")
+                    #misc.plot_field(Press, True, title=f'Pressure Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_press_field.png")
                     misc.plot_field(o2, True, title=f'O2 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_O2.png")
                     misc.plot_field(n2, True, title=f'N2 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_N2.png")
                     misc.plot_field(ch4, True, title=f'CH4 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_CH4.png")
                     misc.plot_field(h2o, True, title=f'H2O Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_H2O.png")
                     misc.plot_field(co2, True, title=f'CO2 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_CO2.png")
                     misc.plot_field(Temp, True, title=f'T° Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_temp_field.png")
-                    misc.plot_diffusive_zone(n2, self.y, self.frame, dt, time)
+                    #misc.plot_diffusive_zone(n2, self.y, self.frame, dt, time)
 
             elif self.frame%frame_period == frame_period-1 :
                 uvcopy = misc.uv_copy(uv)
 
-            if time >= 2e-5:
+       
+            if time >= self.time_ignite:
                 # This function ignites the middle of the box to 1000 K or more.
                 Temp.ignite_or_not()
+
 
             # Temperature transport
             self._update_RK2_temperature(uv, Temp)
                 
             # Population transport
             self._update_RK2_species(uv, o2)
-            self._update_RK2_species(uv, n2)
+            #self._update_RK2_species(uv, n2)
             self._update_RK2_species(uv, ch4)
             self._update_RK2_species(uv, h2o)
             self._update_RK2_species(uv, co2)
 
-            #ch4_investigate = np.argwhere(np.isnan(ch4.values))
+            #if hasIgnitionStarted:
+            #    misc.plot_field(ch4, False, title=f'CH4 Population just before chemistry k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_CH4_beforeChem.png")
 
-            # Chemistry, impacting all species populations and temperature.
-            i_reactor = self.i_reactor
-            j_reactor = self.j_reactor
-            suivitime = [0.]
-            suivio2 = [o2.values[i_reactor, j_reactor]]
-            suivin2 = [n2.values[i_reactor, j_reactor]]
-            suivich4 = [ch4.values[i_reactor, j_reactor]]
-            suivih2o = [h2o.values[i_reactor, j_reactor]]
-            suivico2 = [co2.values[i_reactor, j_reactor]]
-            suiviT = [Temp.values[i_reactor, j_reactor]]
-            
-            self.chem_frame = 0
-            nchem = self.dtchem_list.shape[0]
 
-            isworth = True
-            while self.chem_frame < nchem and isworth:
-                o2_values_0 = np.copy(o2.values)
-                T_values_0 = np.copy(Temp.values)
-                dtchem = self.dtchem_list[self.chem_frame]
-                #print(f"\tChem. frame = {self.chem_frame}\t ; dtchem={dtchem:.3e}")
-                self._converge_all_species(o2, n2, ch4, h2o, co2, Temp, dtchem)
-                isworth = misc.worth_continue_chemistry(o2_values_0, o2.values, T_values_0, Temp.values, self.ghost_thick, dtchem)
-                if self.frame%frame_period == 0:
-                    suivitime.append(suivitime[-1]+dtchem)
-                    suivio2.append(o2.values[i_reactor, j_reactor])
-                    suivin2.append(n2.values[i_reactor, j_reactor])
-                    suivich4.append(ch4.values[i_reactor, j_reactor])
-                    suivih2o.append(h2o.values[i_reactor, j_reactor])
-                    suivico2.append(co2.values[i_reactor, j_reactor])
-                    suiviT.append(Temp.values[i_reactor, j_reactor])
-                self.chem_frame += 1
+            if time >= self.time_ignite:
+                if not hasIgnitionStarted:
+                    print(f"\tIgnition started at {time:.3e} s\t, frame {self.frame}.")
+                    frame_igni = self.frame
+                    chemistry_solver.chemistry_loop(o2, ch4, h2o, co2, Temp, self.L, self.frame, self.dtchem_list, rho, self.c_p, self.Ta, self.i_reactor, self.j_reactor, True)
+                    hasIgnitionStarted = True
+                else:
+                    chemistry_solver.chemistry_loop(o2, ch4, h2o, co2, Temp, self.L, self.frame, self.dtchem_list, rho, self.c_p, self.Ta, self.i_reactor, self.j_reactor, False)
 
-            if self.frame%frame_period == 0:
-                misc.plot_chemistry(suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT, i_reactor, j_reactor, self.frame)
+                #misc.plot_field(o2, False, title=f'O2 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_O2.png")
+                #misc.plot_field(ch4, False, title=f'CH4 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_CH4.png")
+                #misc.plot_field(h2o, False, title=f'H2O Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_H2O.png")
+                #misc.plot_field(co2, False, title=f'CO2 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_CO2.png")
+                #misc.plot_field(Temp, False, title=f'T° Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_temp_field.png")                
+
+
 
             o2.fillGhosts()
             n2.fillGhosts()
@@ -545,6 +514,7 @@ class CounterFlowCombustion():
             h2o.fillGhosts()
             co2.fillGhosts()
             Temp.fillGhosts()
+
 
             #misc.register_array_csv(f"{self.frame}_ch4_endofframe.csv", ch4.values)
 
@@ -573,11 +543,17 @@ class CounterFlowCombustion():
         misc.plot_strain_rate(uv, self.y, title=f"Spatial representation of th strain rate along the slipping wall\nMax is {uv.max_strain_rate:.4e} Hz", saveaspng=str(self.frame)+"_strain_rate.png")
         misc.plot_field(Press, True, title=f'Pressure Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_press_field.png")
         misc.plot_field(o2, True, title=f'O2 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_O2.png")
+        """
+        misc.plot_field(o2, True, title=f'O2 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_O2.png")
+
+        """
         misc.plot_field(n2, True, title=f'N2 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_N2.png")
+        """
         misc.plot_field(ch4, True, title=f'CH4 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_CH4.png")
         misc.plot_field(h2o, True, title=f'H2O Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_H2O.png")
         misc.plot_field(co2, True, title=f'CO2 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_CO2.png")
-        misc.plot_field(Temp, True, title=f'T° Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_temp_field.png")
+        misc.plot_field(Temp, True, title=f'T° Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_temp_field.png")        
+        """
         misc.plot_diffusive_zone(n2, self.y, self.frame, dt, time)
 
         # About to print and write in final file the report of the simulation.

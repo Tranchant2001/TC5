@@ -110,6 +110,8 @@ def plot_uv(uv:VelocityField, X, Y, **kwargs):
         plt.pause(kwargs.get('pause'))
     plt.close(fig1)
 
+    plt.close()
+
 
 def plot_strain_rate(uv:VelocityField, y, **kwargs):
 
@@ -126,6 +128,7 @@ def plot_strain_rate(uv:VelocityField, y, **kwargs):
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get('pause'))
     plt.close(fig2)
+    plt.close()
 
 
 def plot_diffusive_zone(n2:Dinitrogen, y, frame:int, dt, time, **kwargs) -> float:
@@ -164,16 +167,27 @@ def plot_diffusive_zone(n2:Dinitrogen, y, frame:int, dt, time, **kwargs) -> floa
     # Plot the N2 population on the left wall.
     pix_L = 0
     k = 0
+    yinf = 0.
+    ysup = 0.
+    a_found = False
     while left_wall_n2[k] <= 0.72:
         if left_wall_n2[k] >= 0.08:
             pix_L += 1
+            if not a_found:
+                if k == 0:
+                    yinf = 0.
+                else:
+                    yinf = (y[k] - y[k-1])*(0.08 - left_wall_n2[k-1])/(left_wall_n2[k] - left_wall_n2[k-1]) + y[k-1]
+                a_found = True
+       
         k += 1
+    if abs(left_wall_n2[k] - left_wall_n2[k-1]) < 1e-9:
+        ysup = yinf
+    else:
+        ysup = (y[k] - y[k-1])*(0.72 - left_wall_n2[k-1])/(left_wall_n2[k] - left_wall_n2[k-1]) + y[k-1]
 
-    length = (pix_L*dx)*1000 # thickness of the diffusive zone in mm.
+    length = (ysup - yinf)*1000 # thickness of the diffusive zone in mm.
     n2.diff_zone_thick = length
-
-    ysup = (y[k] - dx/2)*1000
-    yinf = (y[k] - dx/2)*1000 - length
 
     max_n2 = np.max(left_wall_n2)
     min_n2 = np.min(left_wall_n2)
@@ -182,8 +196,8 @@ def plot_diffusive_zone(n2:Dinitrogen, y, frame:int, dt, time, **kwargs) -> floa
     ax2.set_xlabel('Y (mm)')
     ax2.set_ylabel('Dinitrogen massic fraction')
     ax2.plot(1000*y, left_wall_n2, label = "$N_2$ mass fraction")
-    ax2.plot([yinf, yinf], [min_n2, max_n2], linestyle='dashed', color="black", label = f"Diffusive zone\n(Thickness={length:.3f} mm)")
-    ax2.plot([ysup, ysup], [min_n2, max_n2], linestyle='dashed', color="black")
+    ax2.plot([yinf*1000, yinf*1000], [min_n2, max_n2], linestyle='dashed', color="black", label = f"Diffusive zone\n(Thickness={length:.3f} mm)")
+    ax2.plot([ysup*1000, ysup*1000], [min_n2, max_n2], linestyle='dashed', color="black")
     ax2.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
     ax2.set_title("$Y_{N_2}$ on the left wall"+ f" k={frame} ($\Delta t=${dt}, N={n2.N}) \n Time: {time:.6f} s")
     plt.legend(loc="upper left", bbox_to_anchor=(1.05, 1.))
@@ -191,6 +205,8 @@ def plot_diffusive_zone(n2:Dinitrogen, y, frame:int, dt, time, **kwargs) -> floa
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get('pause'))
     plt.close(fig2)
+
+    plt.close()
 
 
 def print_write_end_message(code, div_crit, max_t_comput, conv_crit, L, D, N, dt, duration_delta, time, frame, uv_consecutive_diff, max_strain_rate, diff_zone_thick):
@@ -329,6 +345,7 @@ def worth_continue_chemistry(o2_0:np.ndarray, o2_1:np.ndarray, T_0:np.ndarray, T
 
 def two_arrays_derivative(arr0:np.ndarray, arr1:np.ndarray, dt:float) -> np.float32:
     pass
+
 
 def register_array_csv(filename:str, arr:np.ndarray):
 

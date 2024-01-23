@@ -1,0 +1,8 @@
+Success: The simulation stopped running because the velocity field was stable enough (uv_consecutive_difference < 1.91e+00).
+	Parameters: (L, D, N, $\Delta t$)=(0.002, 1.5e-05, 101, 2.8935185185185184e-06)
+	Simulation duration: 0:01:56.481686
+	Virtual stop time: 0.09597800925925926 s
+	Virtual stop frame: 33171
+	Velocity consecutive difference: 1.71e+00
+	Maximum strain rate on the left wall: 1471.6007080078125 Hz
+	Thickness of the diffusive zone: 0.2633731107915537 mm
