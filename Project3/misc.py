@@ -41,8 +41,8 @@ def plot_field(fi:Field, display_ghost=False, **kwargs):
     ax.set_ylabel('Y')
     if 'title' in kwargs.keys():
         ax.set_title(kwargs.get('title'))
-
-    image = ax.imshow(phi_copy, origin='lower', cmap='viridis')
+    
+    image = ax.imshow(phi_copy, origin='lower', cmap='viridis', vmin=kwargs.get('vmin', None), vmax=kwargs.get('vmax', None))
     fig.colorbar(image, ax=ax)
     if 'saveaspng' in kwargs.keys():
         plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
@@ -61,6 +61,13 @@ def uv_copy(uv:VelocityField) -> VelocityField:
     return new
 
 
+def temp_copy(Temp:TemperatureField) -> TemperatureField:
+
+    new = TemperatureField(np.copy(Temp.values), Temp.dx, Temp.got_ghost_cells, Temp.ghost_thick)
+
+    return new    
+
+
 def velocity_derivative_norm(uv0:VelocityField, uv1:VelocityField, dt:float) -> np.float32:
     thick0 = uv0.ghost_thick
     u0 = uv0.u.values[thick0:-thick0 , thick0:-thick0]
@@ -71,6 +78,16 @@ def velocity_derivative_norm(uv0:VelocityField, uv1:VelocityField, dt:float) -> 
     v1 = uv1.v.values[thick1:-thick1 , thick1:-thick1]
 
     return np.mean(np.sqrt( ((u0 - u1)/dt)**2 + ((v0 - v1)/dt)**2))
+
+
+def temperature_derivative(T0:TemperatureField, T1:TemperatureField, dt:float) -> np.float32:
+    thick0 = T0.ghost_thick
+    T0_arr = T0.values[thick0:-thick0 , thick0:-thick0]
+    
+    thick1 = T1.ghost_thick
+    T1_arr = T1.values[thick1:-thick1 , thick1:-thick1]
+
+    return np.mean(np.sqrt( ((T0_arr - T1_arr)/dt)**2 ))    
 
 
 def array_residual(f0:np.ndarray, thick0:int, f1:np.ndarray, thick1:int) -> np.float32:
@@ -209,9 +226,9 @@ def plot_diffusive_zone(n2:Dinitrogen, y, frame:int, dt, time, **kwargs) -> floa
     plt.close()
 
 
-def print_write_end_message(code, div_crit, max_t_comput, conv_crit, L, D, N, dt, duration_delta, time, frame, uv_consecutive_diff, max_strain_rate, diff_zone_thick):
+def print_write_end_message(code, div_crit, max_t_comput, uv_conv_crit, temp_conv_crit, L, D, N, dt, duration_delta, time, frame, uv_consecutive_diff, temp_cons_diff, max_strain_rate, diff_zone_thick, maxT):
     
-    assert(code in ["divergence", "timeout", "success"])
+    assert(code in ["divergence", "timeout", "success_velocity", "success_temp"])
     
     first_line = ""
     
@@ -219,18 +236,22 @@ def print_write_end_message(code, div_crit, max_t_comput, conv_crit, L, D, N, dt
         first_line = f"Warning: The simulation stopped running because a divergence was detected (vel_metric >= {div_crit})."
     elif code == "timeout":
         first_line = "Warning: The simulation stopped running because the max duration of simulation ("+str(max_t_comput)+") was reached."
-    elif code == "success":
-        first_line = f"Success: The simulation stopped running because the velocity field was stable enough (uv_consecutive_difference < {conv_crit:.2e})."
+    elif code == "success_velocity":
+        first_line = f"Success: The simulation stopped running because the velocity field was stable enough (uv_consecutive_difference < {uv_conv_crit:.2e})."
+    elif code == "success_temp":
+        first_line = f"Success: The simulation stopped running because the T° field was stable enough (temp_consecutive_difference < {temp_conv_crit:.2e})."        
 
     parameters =   f"\tParameters: (L, D, N, $\Delta t$)=({L}, {D}, {N}, {dt})"
     simu_duration = "\tSimulation duration: "+str(duration_delta)
     vtime =        f"\tVirtual stop time: {time} s"
     vframe =       f"\tVirtual stop frame: {frame}"
     uv_difference =f"\tVelocity consecutive difference: {uv_consecutive_diff:.2e}"
+    temp_diff =    f"\tT° consecutive difference: {temp_cons_diff:.2e}" 
     max_srate =    f"\tMaximum strain rate on the left wall: {max_strain_rate} Hz"
     diff_zone =    f"\tThickness of the diffusive zone: {diff_zone_thick} mm"
+    flame_Temp =   f"\tMax. T° of the flame: {maxT} K." 
 
-    message = first_line + "\n" + parameters + "\n" + simu_duration + "\n" + vtime + "\n" + vframe + "\n" + uv_difference + "\n" + max_srate+ "\n" + diff_zone + "\n"
+    message = first_line + "\n" + parameters + "\n" + simu_duration + "\n" + vtime + "\n" + vframe + "\n" + uv_difference + "\n" + temp_diff + "\n" + max_srate+ "\n" + diff_zone + "\n" + flame_Temp + "\n"
 
     print(message)
 

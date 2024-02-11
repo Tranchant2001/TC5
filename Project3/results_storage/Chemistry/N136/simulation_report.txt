@@ -1,0 +1,10 @@
+Success: The simulation stopped running because the T° field was stable enough (temp_consecutive_difference < 1.80e+02).
+	Parameters: (L, D, N, $\Delta t$)=(0.002, 1.5e-05, 136, 1.5539109997474893e-06)
+	Simulation duration: 0:06:28.224675
+	Virtual stop time: 0.06341510789969504 s
+	Virtual stop frame: 40811
+	Velocity consecutive difference: 3.54e+00
+	T° consecutive difference: 1.74e+02
+	Maximum strain rate on the left wall: 1475.957275390625 Hz
+	Thickness of the diffusive zone: 0.0 mm
+	Max. T° of the flame: 2668.71728515625 K.

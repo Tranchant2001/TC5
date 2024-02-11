@@ -28,7 +28,7 @@ class TemperatureField(Field):
 
         elif not got_ghost_cells and ghost_thick > 0:
             self.ghost_thick = 0
-            self.got_ghost_cells = False          
+            self.got_ghost_cells = False
             self._addGhosts(ghost_thick)
             self.fillGhosts()
 
@@ -38,6 +38,7 @@ class TemperatureField(Field):
 
         self.N = self.shape[0]
         self.last_nb_iter = -1
+        self.maxT_flame = np.max(self.values[ghost_thick:-ghost_thick, ghost_thick:-ghost_thick])
 
     def fillGhosts(self):
 

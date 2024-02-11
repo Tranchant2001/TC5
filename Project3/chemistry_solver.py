@@ -238,7 +238,6 @@ def chemistry_loop(o2:Dioxygen, ch4:Methane, h2o:Water,co2:CarbonDioxide, Temp:T
 
         plot_chemistry(suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT, i_reactor, j_reactor, frame)
 
-
 @njit
 def is_worth_continue(o2_previous:float, o2_current:float, Temp_previous:float, Temp_current:float, dtchem:float):
     max_derive_o2 = abs((o2_current - o2_previous)/dtchem)
