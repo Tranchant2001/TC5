@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from field import Field
-from velocity_field import VelocityField
+from modules.field import Field
+from modules.velocity_field import VelocityField
 
 ### CLASS   ###
 

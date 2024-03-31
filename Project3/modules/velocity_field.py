@@ -3,7 +3,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-from field import Field
+
+from modules.field import Field
 
 
 

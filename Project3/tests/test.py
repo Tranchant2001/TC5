@@ -48,3 +48,10 @@ dirpath = os.path.dirname(fullpath)
 print(fullpath)
 print(dirpath)
 print(dirpath+"\\outputs")
+projectpath = os.path.dirname(dirpath)
+print(projectpath)
+
+"Test 9"
+print(type(fullpath))
+print(type(dirpath))
+print(type(projectpath))

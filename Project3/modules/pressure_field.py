@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import os
 from numba import njit
 
-from field import Field
+from modules.field import Field
 #from numba_functions import numba_update_SOR_forward, numba_update_SOR_backward
 
 

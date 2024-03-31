@@ -10,17 +10,21 @@ from numba import njit
 import datetime
 
 
-from field import Field
-from velocity_field import VelocityField
-from pressure_field import PressureField
-from species import Species, Dioxygen, Dinitrogen, Methane, Water, CarbonDioxide
-from temperature_field import TemperatureField
-import misc
+from modules.field import Field
+from modules.velocity_field import VelocityField
+from modules.pressure_field import PressureField
+from modules.species import Species, Dioxygen, Dinitrogen, Methane, Water, CarbonDioxide
+from modules.temperature_field import TemperatureField
+import modules.misc
 
 #Chemin absolu du fichier .py qu'on execute
 fullpath = os.path.abspath(__file__)
 #Chemin absolu du dossier contenant le .py qu'on execute
-dirpath = os.path.dirname(fullpath)
+modulepath = os.path.dirname(fullpath)
+# Chemin absolu du dossier du Projet
+projectpath = os.path.dirname(modulepath)
+# Chemin absolu du dossier de figures
+figpath = projectpath + "\\outputs\\Figures"
 
 @njit
 def numba_RK2(physN:int, dt_transport:float, o2_arr:np.ndarray, W_o2, st_o2, Dhf_o2, ch4_arr:np.ndarray, W_ch4, st_ch4, Dhf_ch4, h2o_arr:np.ndarray, W_h2o, st_h2o, Dhf_h2o, co2_arr:np.ndarray, W_co2, st_co2, Dhf_co2, Temp_arr:np.ndarray, Ta, rho, c_p, i_reactor, j_reactor, thick:int, zero_th:float, suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT):
@@ -168,7 +172,7 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_
     ax1.plot(suivi_time, suivi_co2, label="CO2", linestyle="-", marker=".")
     plt.legend()
     savename1 = f"{frame}_i{i}j{j}_species.png"
-    plt.savefig(dirpath+"/outputs_chemistry/"+savename1, dpi=108, bbox_inches="tight")
+    plt.savefig(figpath+"\\"+savename1, dpi=108, bbox_inches="tight")
     plt.close(fig1)
 
     fig2 = plt.figure()
@@ -176,7 +180,7 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_
     plt.xlabel("Time (s)")
     plt.ylabel("Temperature (K)")
     savename2 = f"{frame}_i{i}j{j}_temperature.png"
-    plt.savefig(dirpath+"/outputs_chemistry/"+savename2, dpi=108, bbox_inches="tight")
+    plt.savefig(figpath+"\\"+savename2, dpi=108, bbox_inches="tight")
     plt.close(fig2)
 
     fig3, ax3 = plt.subplots()
@@ -189,7 +193,7 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_
     ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_co2, suivi_time)) , label="dCO2/dt",  linestyle="-", marker=".")
     plt.legend()
     savename3 = f"{frame}_i{i}j{j}_species_deriv.png"
-    plt.savefig(dirpath+"/outputs_chemistry/"+savename3, dpi=108, bbox_inches="tight")
+    plt.savefig(figpath+"\\"+savename3, dpi=108, bbox_inches="tight")
     plt.close(fig3)
 
     fig4 = plt.figure()
@@ -197,7 +201,7 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_
     plt.xlabel("Time (s)")
     plt.ylabel("Absolute temperature derivative (K/s)")
     savename4 = f"{frame}_i{i}j{j}_temperature_deriv.png"
-    plt.savefig(dirpath+"/outputs_chemistry/"+savename4, dpi=108, bbox_inches="tight")
+    plt.savefig(figpath+"\\"+savename4, dpi=108, bbox_inches="tight")
     plt.close(fig2)
 
 

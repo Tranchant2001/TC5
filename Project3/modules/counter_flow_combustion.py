@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 import datetime
 import math
 
-from field import Field
-from velocity_field import VelocityField
-from pressure_field import PressureField
-from species import Species, Dioxygen, Dinitrogen, Methane, Water, CarbonDioxide
-from temperature_field import TemperatureField
-import misc
-import chemistry_solver
+from modules.field import Field
+from modules.velocity_field import VelocityField
+from modules.pressure_field import PressureField
+from modules.species import Species, Dioxygen, Dinitrogen, Methane, Water, CarbonDioxide
+from modules.temperature_field import TemperatureField
+import modules.misc as misc
+import modules.chemistry_solver as chemistry_solver
 
 
 

@@ -5,17 +5,22 @@ import numpy as np
 import matplotlib.pyplot as plt
 import datetime
 import math
-from field import Field
-from velocity_field import VelocityField
-from pressure_field import PressureField
-import misc
+
+from modules.field import Field
+from modules.velocity_field import VelocityField
+from modules.pressure_field import PressureField
+import modules.misc as misc
 
 
 
 #Chemin absolu du fichier .py qu'on execute
 fullpath = os.path.abspath(__file__)
 #Chemin absolu du dossier contenant le .py qu'on execute
-dirpath = os.path.dirname(fullpath)
+modulepath = os.path.dirname(fullpath)
+# Chemin absolu du dossier du Projet
+projectpath = os.path.dirname(modulepath)
+# Chemin absolu du dossier de figures
+datapath = projectpath + "\\outputs\\Data"
 
 
 
@@ -203,7 +208,7 @@ class FluidFlow():
 
         print(message)
 
-        endfile = open(dirpath+"/outputs_program_ecoulement/simulation_report.txt", "w")
+        endfile = open(datapath+"\\simulation_report.txt", "w")
         endfile.write(message)
 
 

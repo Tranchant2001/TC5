@@ -7,22 +7,24 @@ from matplotlib.ticker import FormatStrFormatter
 import matplotlib.dates as mdates
 from matplotlib.ticker import AutoMinorLocator
 
-from velocity_field import VelocityField
-from field import Field
-from species import Dinitrogen
-from species import Dioxygen
-from temperature_field import TemperatureField
+from modules.velocity_field import VelocityField
+from modules.field import Field
+from modules.species import Dinitrogen
+from modules.species import Dioxygen
+from modules.temperature_field import TemperatureField
 
 
 
 #Chemin absolu du fichier .py qu'on execute
 fullpath = os.path.abspath(__file__)
 #Chemin absolu du dossier contenant le .py qu'on execute
-dirpath = os.path.dirname(fullpath)
+modulepath = os.path.dirname(fullpath)
+#Chemin absolu du projet
+projectpath = os.path.dirname(modulepath)
 # Chemin des data
-data_path = dirpath + "\\outputs\\Data"
+data_path = projectpath + "\\outputs\\Data"
 # Chemin des figures
-fig_path = dirpath + "\\outputs\\Figures"
+fig_path = projectpath + "\\outputs\\Figures"
 
 
 def plot_field(fi:Field, display_ghost=False, **kwargs):
