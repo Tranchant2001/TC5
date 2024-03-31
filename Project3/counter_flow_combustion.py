@@ -504,10 +504,10 @@ class CounterFlowCombustion():
                 if not hasIgnitionStarted:
                     print(f"\tIgnition started at {time:.3e} s\t, frame {self.frame}.")
                     frame_igni = self.frame
-                    chemistry_solver.chemistry_loop(o2, ch4, h2o, co2, Temp, self.L, self.frame, self.dtchem_list, rho, self.c_p, self.Ta, self.i_reactor, self.j_reactor, True)
+                    chemistry_solver.chemistry_loop(o2, ch4, h2o, co2, Temp, self.L, self.frame, dt, rho, self.c_p, self.Ta, self.i_reactor, self.j_reactor, True)
                     hasIgnitionStarted = True
                 else:
-                    chemistry_solver.chemistry_loop(o2, ch4, h2o, co2, Temp, self.L, self.frame, self.dtchem_list, rho, self.c_p, self.Ta, self.i_reactor, self.j_reactor, False)
+                    chemistry_solver.chemistry_loop(o2, ch4, h2o, co2, Temp, self.L, self.frame, dt, rho, self.c_p, self.Ta, self.i_reactor, self.j_reactor, False)
 
                 #misc.plot_field(o2, False, title=f'O2 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_O2.png")
                 #misc.plot_field(ch4, False, title=f'CH4 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_CH4.png")

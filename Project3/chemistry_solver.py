@@ -22,30 +22,40 @@ fullpath = os.path.abspath(__file__)
 dirpath = os.path.dirname(fullpath)
 
 @njit
-def numba_RK2(physN:int, dtchemlist:np.ndarray, o2_arr:np.ndarray, W_o2, st_o2, Dhf_o2, ch4_arr:np.ndarray, W_ch4, st_ch4, Dhf_ch4, h2o_arr:np.ndarray, W_h2o, st_h2o, Dhf_h2o, co2_arr:np.ndarray, W_co2, st_co2, Dhf_co2, Temp_arr:np.ndarray, Ta, rho, c_p, i_reactor, j_reactor, thick:int, zero_th:float, suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT):
+def numba_RK2(physN:int, dt_transport:float, o2_arr:np.ndarray, W_o2, st_o2, Dhf_o2, ch4_arr:np.ndarray, W_ch4, st_ch4, Dhf_ch4, h2o_arr:np.ndarray, W_h2o, st_h2o, Dhf_h2o, co2_arr:np.ndarray, W_co2, st_co2, Dhf_co2, Temp_arr:np.ndarray, Ta, rho, c_p, i_reactor, j_reactor, thick:int, zero_th:float, suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT):
     
-    nchem = dtchemlist.shape[0]
-
+    nsuivi = suivio2.shape[0]
+    
     for i in range(physN):
         for j in range(physN):
-            if i == i_reactor-thick and j == j_reactor-thick:
+            # lines useful for debugging
+            if i == i_reactor and j == j_reactor:
                 nothing = True
             isworth = True
             frame_chem = 0
+            time_chem = 0.
             o20 = o2_arr[i,j]
             ch40 = ch4_arr[i,j]
             h2o0 = h2o_arr[i,j]
             co20 = co2_arr[i,j]
             Temp0 = Temp_arr[i,j]
-            while frame_chem < nchem and isworth:
-                
-                dtchem = dtchemlist[frame_chem]
-                
-                if bool(np.isnan(o2_arr[i,j])) or bool(np.isnan(ch4_arr[i,j])):
-                    pass 
+            while time_chem < dt_transport and isworth:
+
+                # lines useful for debugging
+                #if bool(np.isnan(o2_arr[i,j])) or bool(np.isnan(ch4_arr[i,j])):
+                #    pass 
 
                 Q = numba_progress_rate(o2_arr[i,j], W_o2, ch4_arr[i,j], W_ch4, Temp_arr[i,j], Ta, rho, zero_th)
                 #print(o2_arr[i,j])
+
+                timescale = get_timescale_problem(Q, rho, c_p, o2_arr[i,j], W_o2, st_o2, ch4_arr[i,j], W_ch4, st_ch4, Dhf_ch4, st_h2o, Dhf_h2o, st_co2, Dhf_co2, Temp_arr[i,j])
+                if time_chem + timescale >= dt_transport:
+                    dtchem = dt_transport - time_chem
+                    time_chem = dt_transport
+                else:
+                    dtchem = timescale
+                    time_chem += timescale
+
                 o2_arr[i,j] = o20 + (0.5*dtchem*st_o2*W_o2/rho)*Q
                 #print(o2_arr[i,j])
                 ch4_arr[i,j] = ch40 + (0.5*dtchem*st_ch4*W_ch4/rho)*Q
@@ -66,8 +76,8 @@ def numba_RK2(physN:int, dtchemlist:np.ndarray, o2_arr:np.ndarray, W_o2, st_o2, 
                 co20 = co2_arr[i,j]
                 Temp0 = Temp_arr[i,j]
 
-                if i == i_reactor-thick and j == j_reactor-thick:
-                    suivitime[frame_chem+1] = suivitime[frame_chem]+dtchem
+                if i == i_reactor and j == j_reactor and frame_chem+1 < nsuivi:
+                    suivitime[frame_chem+1] = time_chem
                     suivio2[frame_chem+1] = o20
                     suivich4[frame_chem+1] = ch40
                     suivih2o[frame_chem+1] = h2o0
@@ -76,6 +86,8 @@ def numba_RK2(physN:int, dtchemlist:np.ndarray, o2_arr:np.ndarray, W_o2, st_o2, 
 
                 frame_chem += 1
 
+"""
+TO DO: implementer un methode implicite
 @njit
 def numba_Linearized_Trapezoidal(physN:int, dtchemlist:np.ndarray, o2_arr:np.ndarray, W_o2, st_o2, Dhf_o2, ch4_arr:np.ndarray, W_ch4, st_ch4, Dhf_ch4, h2o_arr:np.ndarray, W_h2o, st_h2o, Dhf_h2o, co2_arr:np.ndarray, W_co2, st_co2, Dhf_co2, Temp_arr:np.ndarray, Ta, rho, c_p, i_reactor, j_reactor, suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT):
 
@@ -124,7 +136,7 @@ def numba_Linearized_Trapezoidal(physN:int, dtchemlist:np.ndarray, o2_arr:np.nda
                     suivico2[frame_chem+1] = co20
                     suiviT[frame_chem+1] = Temp0
 
-                frame_chem += 1
+                frame_chem += 1"""
 
 @njit
 def numba_progress_rate(o2_val, W_o2, ch4_val, W_ch4, T_val, Ta, rho, zero_th:float):
@@ -188,39 +200,38 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_
     plt.close(fig2)
 
 
-def chemistry_loop(o2:Dioxygen, ch4:Methane, h2o:Water,co2:CarbonDioxide, Temp:TemperatureField, L:float, frame:int, dtchemlist, rho, c_p, Ta:float, i_reactor, j_reactor, showAndSave):
+def chemistry_loop(o2:Dioxygen, ch4:Methane, h2o:Water,co2:CarbonDioxide, Temp:TemperatureField, L:float, frame:int, dt_transport:float, rho, c_p, Ta:float, i_reactor, j_reactor, showAndSave):
     
     thick = o2.ghost_thick
     physN = o2.N - 2*thick
 
     dx = L/(physN-1)
-    Na = 6.0221408e+23
-    zero_threshold = 1/(Na*dx**3)
-
-    nchem = dtchemlist.shape[0]
-
+    Na = 6.0221408e+23 # Avogadro number
+    zero_threshold = 1/(Na*dx**3) # if the density number gets under this threshold, it means that there is < 1 particle per mesh volume so its physically 0. 
     o2_arr = o2.values[thick:-thick,thick:-thick]
     ch4_arr = ch4.values[thick:-thick,thick:-thick]
     h2o_arr = h2o.values[thick:-thick,thick:-thick]
     co2_arr = co2.values[thick:-thick,thick:-thick]
     Temp_arr = Temp.values[thick:-thick,thick:-thick]
 
-    suivitime = np.full(nchem+1, -1.0)
-    suivio2 = np.full(nchem+1, -1.0)
-    suivich4 = np.full(nchem+1, -1.0)
-    suivih2o = np.full(nchem+1, -1.0)
-    suivico2 = np.full(nchem+1, -1.0)
-    suiviT = np.full(nchem+1, -1.0)
+    # We dont know in advance how much time step there will be but 200 is a good number.
+    suivitime = np.full(200, -1.0)
+    suivio2 = np.full(200, -1.0)
+    suivich4 = np.full(200, -1.0)
+    suivih2o = np.full(200, -1.0)
+    suivico2 = np.full(200, -1.0)
+    suiviT = np.full(200, -1.0)
 
+    # inserting ther first value inside.
     suivitime[0] = 0.
-    # Les indices i_reactor et j_reactor prennent en compte la taille des ghost_cells. Donc ici pas besoin de retirer thick.
-    suivio2[0] = o2.values[i_reactor, j_reactor]
-    suivich4[0] = ch4.values[i_reactor, j_reactor]
-    suivih2o[0] = h2o.values[i_reactor, j_reactor]
-    suivico2[0] = co2.values[i_reactor, j_reactor]
-    suiviT[0] = Temp.values[i_reactor, j_reactor]
+    # Les indices i_reactor et j_reactor ne prennent pas en compte la taille des ghost_cells. Donc ici pas besoin de retirer/ajouter thick.
+    suivio2[0] = o2_arr[i_reactor, j_reactor]
+    suivich4[0] = ch4_arr[i_reactor, j_reactor]
+    suivih2o[0] = h2o_arr[i_reactor, j_reactor]
+    suivico2[0] = co2_arr[i_reactor, j_reactor]
+    suiviT[0] = Temp_arr[i_reactor, j_reactor]
 
-    numba_RK2(physN, dtchemlist, o2_arr, o2.W, o2.stoech, o2.Dhf, ch4_arr, ch4.W, ch4.stoech, ch4.Dhf, h2o_arr, h2o.W, h2o.stoech, h2o.Dhf, co2_arr, co2.W, co2.stoech, co2.Dhf, Temp_arr, Ta, rho, c_p, i_reactor, j_reactor, thick, zero_threshold,suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT)
+    numba_RK2(physN, dt_transport, o2_arr, o2.W, o2.stoech, o2.Dhf, ch4_arr, ch4.W, ch4.stoech, ch4.Dhf, h2o_arr, h2o.W, h2o.stoech, h2o.Dhf, co2_arr, co2.W, co2.stoech, co2.Dhf, Temp_arr, Ta, rho, c_p, i_reactor, j_reactor, thick, zero_threshold,suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT)
 
     o2.values[thick:-thick,thick:-thick]    =   o2_arr
     ch4.values[thick:-thick,thick:-thick]   =   ch4_arr
@@ -238,6 +249,7 @@ def chemistry_loop(o2:Dioxygen, ch4:Methane, h2o:Water,co2:CarbonDioxide, Temp:T
 
         plot_chemistry(suivitime, suivio2, suivich4, suivih2o, suivico2, suiviT, i_reactor, j_reactor, frame)
 
+
 @njit
 def is_worth_continue(o2_previous:float, o2_current:float, Temp_previous:float, Temp_current:float, dtchem:float):
     max_derive_o2 = abs((o2_current - o2_previous)/dtchem)
@@ -246,11 +258,19 @@ def is_worth_continue(o2_previous:float, o2_current:float, Temp_previous:float, 
     return (max_derive_o2 > 50. or max_deriv_T > 5e5)
 
 
-def set_dtchem_list(dt):
+@njit
+def get_timescale_problem(Q, rho, c_p, o2_val, W_o2, st_o2, ch4_val, W_ch4, st_ch4, Dhf_ch4, st_h2o, Dhf_h2o, st_co2, Dhf_co2, T_val)->float:
+    
+    timescale = 1.
+    if Q != 0.:
+        timescales_arr = np.zeros(3, dtype=float)
+        timescales_arr[0] = abs(ch4_val*rho/(st_ch4*W_ch4*Q)) #timescale of ch4 variation.
+        timescales_arr[1] = abs(o2_val*rho/(st_o2*W_o2*Q)) #timescale of o2 variation.
+        timescales_arr[2] = abs(T_val*rho*c_p/(-(Dhf_ch4*st_ch4 + Dhf_h2o*st_h2o + Dhf_co2*st_co2)*Q)) #timescale of T° variation.
+        
+        timescale = 0.2*np.min(timescales_arr)
 
-        l4 = np.full(800, dt/800)
-
-        return l4
+    return timescale
 
 
 def test():
@@ -273,7 +293,6 @@ def test():
     max_CFL = 0.5 # CFL limit thresholf in 2D
     dt = 0.4*min(max_Fo*(dx**2)/D, max_CFL*dx/max_u)   # Time step
     print(dt)
-    dtchemlist = set_dtchem_list(dt)
 
     # Initializing the species
     o2 = Dioxygen(np.full((physN, physN), 0.2, dtype=float), dx, L_slot, L_coflow, rho, False, thick)
@@ -300,7 +319,7 @@ def test():
 
     start_datetime = datetime.datetime.now()
     
-    chemistry_loop(o2, ch4, h2o, co2, Temp, L, frame, dtchemlist, rho, c_p, Ta, i_reactor, j_reactor, True)
+    chemistry_loop(o2, ch4, h2o, co2, Temp, L, frame, dt, rho, c_p, Ta, i_reactor, j_reactor, True)
 
     stop_datetime = datetime.datetime.now()
 
@@ -312,4 +331,3 @@ def test():
     misc.plot_field(h2o, True, title=f'H2O Population k=0 ($\Delta t=${dt})', saveaspng="1_H2O.png")
     misc.plot_field(co2, True, title=f'CO2 Population k=0 ($\Delta t=${dt})', saveaspng="1_CO2.png")
     misc.plot_field(Temp, True, title=f'T° Field k=0 ($\Delta t=${dt})',saveaspng="1_temp_field.png")
-
