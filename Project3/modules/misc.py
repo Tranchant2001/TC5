@@ -19,6 +19,10 @@ from temperature_field import TemperatureField
 fullpath = os.path.abspath(__file__)
 #Chemin absolu du dossier contenant le .py qu'on execute
 dirpath = os.path.dirname(fullpath)
+# Chemin des data
+data_path = dirpath + "\\outputs\\Data"
+# Chemin des figures
+fig_path = dirpath + "\\outputs\\Figures"
 
 
 def plot_field(fi:Field, display_ghost=False, **kwargs):
@@ -45,7 +49,7 @@ def plot_field(fi:Field, display_ghost=False, **kwargs):
     image = ax.imshow(phi_copy, origin='lower', cmap='viridis', vmin=kwargs.get('vmin', None), vmax=kwargs.get('vmax', None))
     fig.colorbar(image, ax=ax)
     if 'saveaspng' in kwargs.keys():
-        plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+        plt.savefig(fig_path+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get("pause"))
     plt.close(fig)
@@ -122,7 +126,7 @@ def plot_uv(uv:VelocityField, X, Y, **kwargs):
         ax1.set_title(kwargs.get('title'))
     ax1.quiver(X, Y, u, v, scale=5)
     if 'saveaspng' in kwargs.keys():
-        plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+        plt.savefig(fig_path+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get('pause'))
     plt.close(fig1)
@@ -141,7 +145,7 @@ def plot_strain_rate(uv:VelocityField, y, **kwargs):
     ax2.plot(1000*y, uv.strain_rate)
     ax2.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
     if 'saveaspng' in kwargs.keys():
-        plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+        plt.savefig(fig_path+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get('pause'))
     plt.close(fig2)
@@ -171,7 +175,7 @@ def plot_diffusive_zone(n2:Dinitrogen, y, frame:int, dt, time, **kwargs) -> floa
     image = ax1.imshow(diffusive_zone, origin='lower', cmap='viridis')
     fig1.colorbar(image, ax=ax1)
 
-    plt.savefig(dirpath+"/outputs_program_ecoulement/"+str(frame)+"_diff_zone.png", dpi=108, bbox_inches="tight")
+    plt.savefig(fig_path+"\\"+str(frame)+"_diff_zone.png", dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get("pause"))
     plt.close(fig1)
@@ -218,7 +222,7 @@ def plot_diffusive_zone(n2:Dinitrogen, y, frame:int, dt, time, **kwargs) -> floa
     ax2.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
     ax2.set_title("$Y_{N_2}$ on the left wall"+ f" k={frame} ($\Delta t=${dt}, N={n2.N}) \n Time: {time:.6f} s")
     plt.legend(loc="upper left", bbox_to_anchor=(1.05, 1.))
-    plt.savefig(dirpath+"/outputs_program_ecoulement/"+str(frame)+"_N2_left_wall.png", dpi=108, bbox_inches="tight")
+    plt.savefig(fig_path+"\\"+str(frame)+"_N2_left_wall.png", dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get('pause'))
     plt.close(fig2)
@@ -255,7 +259,7 @@ def print_write_end_message(code, div_crit, max_t_comput, uv_conv_crit, temp_con
 
     print(message)
 
-    endfile = open(dirpath+"/outputs_program_ecoulement/simulation_report.txt", "w")
+    endfile = open(data_path+"\\simulation_report.txt", "w")
     endfile.write(message)
 
 
@@ -271,7 +275,7 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_
     ax1.plot(suivi_time, suivi_co2, label="CO2", linestyle="-", marker=".")
     plt.legend()
     savename1 = f"{frame}_i{i}j{j}_species.png"
-    plt.savefig(dirpath+"/outputs_program_ecoulement/"+savename1, dpi=108, bbox_inches="tight")
+    plt.savefig(fig_path+"\\"+savename1, dpi=108, bbox_inches="tight")
     plt.close(fig1)
 
     fig2 = plt.figure()
@@ -279,7 +283,7 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_
     plt.xlabel("Time (s)")
     plt.ylabel("Temperature (K)")
     savename2 = f"{frame}_i{i}j{j}_temperature.png"
-    plt.savefig(dirpath+"/outputs_program_ecoulement/"+savename2, dpi=108, bbox_inches="tight")
+    plt.savefig(fig_path+"\\"+savename2, dpi=108, bbox_inches="tight")
     plt.close(fig2)
 
     fig3, ax3 = plt.subplots()
@@ -292,7 +296,7 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_
     ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_co2, suivi_time)) , label="dCO2/dt",  linestyle="-", marker=".")
     plt.legend()
     savename3 = f"{frame}_i{i}j{j}_species_deriv.png"
-    plt.savefig(dirpath+"/outputs_program_ecoulement/"+savename3, dpi=108, bbox_inches="tight")
+    plt.savefig(fig_path+"\\"+savename3, dpi=108, bbox_inches="tight")
     plt.close(fig3)
 
     fig4 = plt.figure()
@@ -300,7 +304,7 @@ def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_
     plt.xlabel("Time (s)")
     plt.ylabel("Absolute temperature derivative (K/s)")
     savename4 = f"{frame}_i{i}j{j}_temperature_deriv.png"
-    plt.savefig(dirpath+"/outputs_program_ecoulement/"+savename4, dpi=108, bbox_inches="tight")
+    plt.savefig(fig_path+"\\"+savename4, dpi=108, bbox_inches="tight")
     plt.close(fig2)
 
 
@@ -318,7 +322,7 @@ def plot_consecutive_deriv(analysis_array:np.ndarray, **kwargs):
         ax1.set_title(kwargs.get('title'))
 
     if 'saveaspng' in kwargs.keys():
-        plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+        plt.savefig(fig_path+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get('pause'))
     plt.close(fig)
@@ -344,7 +348,7 @@ def plot_array(array, **kwargs):
     image = ax.imshow(array, origin='lower', cmap='viridis')
     fig.colorbar(image, ax=ax)
     if 'saveaspng' in kwargs.keys():
-        plt.savefig(dirpath+"/outputs_program_ecoulement/"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+        plt.savefig(fig_path+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.show()
         plt.pause(kwargs.get("pause"))
@@ -370,5 +374,5 @@ def two_arrays_derivative(arr0:np.ndarray, arr1:np.ndarray, dt:float) -> np.floa
 
 def register_array_csv(filename:str, arr:np.ndarray):
 
-    np.savetxt(dirpath+"/outputs_program_ecoulement/"+filename, arr, delimiter="\t", fmt="%.3e")
+    np.savetxt(data_path+"\\"+filename, arr, delimiter="\t", fmt="%.3e")
 

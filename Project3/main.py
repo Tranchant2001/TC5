@@ -17,8 +17,7 @@ Propagating the Fluid flow in the chamber.
 
 
 import datetime
-from counter_flow_combustion import CounterFlowCombustion
-from fluid_flow import FluidFlow
+from modules.counter_flow_combustion import CounterFlowCombustion
 
 
 
