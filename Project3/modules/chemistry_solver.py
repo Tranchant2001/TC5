@@ -15,7 +15,7 @@ from modules.velocity_field import VelocityField
 from modules.pressure_field import PressureField
 from modules.species import Species, Dioxygen, Dinitrogen, Methane, Water, CarbonDioxide
 from modules.temperature_field import TemperatureField
-import modules.misc
+import modules.misc as misc
 
 #Chemin absolu du fichier .py qu'on execute
 fullpath = os.path.abspath(__file__)
