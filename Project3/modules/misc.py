@@ -6,11 +6,12 @@ import os
 from matplotlib.ticker import FormatStrFormatter
 import matplotlib.dates as mdates
 from matplotlib.ticker import AutoMinorLocator
+import h5py
 
-from modules.velocity_field import VelocityField
 from modules.field import Field
-from modules.species import Dinitrogen
-from modules.species import Dioxygen
+from modules.velocity_field import VelocityField
+from modules.pressure_field import PressureField
+from modules.species import Species, Dioxygen, Dinitrogen, Methane, Water, CarbonDioxide
 from modules.temperature_field import TemperatureField
 
 
@@ -22,10 +23,12 @@ modulepath = os.path.dirname(fullpath)
 #Chemin absolu du projet
 projectpath = os.path.dirname(modulepath)
 # Chemin des data
-data_path = projectpath + "\\outputs\\Data"
+datapath = projectpath + "\\outputs\\Data"
 # Chemin des figures
-fig_path = projectpath + "\\outputs\\Figures"
+figpath = projectpath + "\\outputs\\Figures"
 
+
+### PLOT FIGURES ###
 
 def plot_field(fi:Field, display_ghost=False, **kwargs):
     """
@@ -51,58 +54,102 @@ def plot_field(fi:Field, display_ghost=False, **kwargs):
     image = ax.imshow(phi_copy, origin='lower', cmap='viridis', vmin=kwargs.get('vmin', None), vmax=kwargs.get('vmax', None))
     fig.colorbar(image, ax=ax)
     if 'saveaspng' in kwargs.keys():
-        plt.savefig(fig_path+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+        plt.savefig(figpath+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get("pause"))
     plt.close(fig)
 
 
-def uv_copy(uv:VelocityField) -> VelocityField:
-    N = uv.N
-    new = VelocityField(np.zeros((N, N), dtype=np.float32), np.zeros((N, N), dtype=np.float32), uv.dx, uv.L_slot, uv.L_slot, uv.got_ghost_cells, uv.ghost_thick)
-    new.v.values = np.copy(uv.v.values)
-    new.u.values = np.copy(uv.u.values)
-    new.update_metric()
+def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_T, i, j, frame):
 
-    return new
+    fig1, ax1 = plt.subplots()
+    ax1.clear()
+    ax1.set_xlabel('Time (s)')
+    ax1.set_ylabel('Massic fraction')
+    ax1.plot(suivi_time, suivi_o2, label="O2", linestyle="-", marker=".")
+    ax1.plot(suivi_time, suivi_ch4, label="CH4", linestyle="-", marker=".")
+    ax1.plot(suivi_time, suivi_h2o, label="H2O", linestyle="-", marker=".")
+    ax1.plot(suivi_time, suivi_co2, label="CO2", linestyle="-", marker=".")
+    plt.legend()
+    savename1 = f"{frame}_i{i}j{j}_species.png"
+    plt.savefig(figpath+"\\"+savename1, dpi=108, bbox_inches="tight")
+    plt.close(fig1)
+
+    fig2 = plt.figure()
+    plt.plot(suivi_time, suivi_T, linestyle="-", marker=".")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Temperature (K)")
+    savename2 = f"{frame}_i{i}j{j}_temperature.png"
+    plt.savefig(figpath+"\\"+savename2, dpi=108, bbox_inches="tight")
+    plt.close(fig2)
+
+    fig3, ax3 = plt.subplots()
+    ax3.clear()
+    ax3.set_xlabel('Time (s)')
+    ax3.set_ylabel('Absolute massic fraction derivative (/s)')
+    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_o2, suivi_time))  , label="dO2/dt",   linestyle="-", marker=".")
+    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_ch4, suivi_time)) , label="dCH4/dt",  linestyle="-", marker=".")
+    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_h2o, suivi_time)) , label="dH2O/dt",  linestyle="-", marker=".")
+    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_co2, suivi_time)) , label="dCO2/dt",  linestyle="-", marker=".")
+    plt.legend()
+    savename3 = f"{frame}_i{i}j{j}_species_deriv.png"
+    plt.savefig(figpath+"\\"+savename3, dpi=108, bbox_inches="tight")
+    plt.close(fig3)
+
+    fig4 = plt.figure()
+    plt.semilogy(suivi_time, np.abs(np.gradient(suivi_T, suivi_time)), linestyle="-", marker=".")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Absolute temperature derivative (K/s)")
+    savename4 = f"{frame}_i{i}j{j}_temperature_deriv.png"
+    plt.savefig(figpath+"\\"+savename4, dpi=108, bbox_inches="tight")
+    plt.close(fig2)
 
 
-def temp_copy(Temp:TemperatureField) -> TemperatureField:
+def plot_consecutive_deriv(analysis_array:np.ndarray, **kwargs):
 
-    new = TemperatureField(np.copy(Temp.values), Temp.dx, Temp.got_ghost_cells, Temp.ghost_thick)
+    fig, ax1 = plt.subplots(layout="constrained")
 
-    return new    
+    frame_arr = analysis_array[0,:]
+    data_arr = analysis_array[2,:]
+
+    ax1.semilogy(frame_arr, data_arr)
+    ax1.set_xlabel("Frame index")
+    ax1.set_ylabel("Consecutive Velocity difference")
+    if 'title' in kwargs.keys():
+        ax1.set_title(kwargs.get('title'))
+
+    if 'saveaspng' in kwargs.keys():
+        plt.savefig(figpath+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+    if 'pause' in kwargs.keys():
+        plt.pause(kwargs.get('pause'))
+    plt.close(fig)
 
 
-def velocity_derivative_norm(uv0:VelocityField, uv1:VelocityField, dt:float) -> np.float32:
-    thick0 = uv0.ghost_thick
-    u0 = uv0.u.values[thick0:-thick0 , thick0:-thick0]
-    v0 = uv0.v.values[thick0:-thick0 , thick0:-thick0]
+def plot_array(array, **kwargs):
+
+    """
+    Plot the state of the scalar field.
+    Specifies in the title the time and the metric
+    """
+
+    # Create a figure and axis for the animation
+    fig, ax = plt.subplots()
     
-    thick1 = uv1.ghost_thick
-    u1 = uv1.u.values[thick1:-thick1 , thick1:-thick1]
-    v1 = uv1.v.values[thick1:-thick1 , thick1:-thick1]
+    # Plot the scalar field
+    ax.clear()
+    ax.set_xlabel('Column index')
+    ax.set_ylabel('Row index')
+    if 'title' in kwargs.keys():
+        ax.set_title(kwargs.get('title'))
 
-    return np.mean(np.sqrt( ((u0 - u1)/dt)**2 + ((v0 - v1)/dt)**2))
-
-
-def temperature_derivative(T0:TemperatureField, T1:TemperatureField, dt:float) -> np.float32:
-    thick0 = T0.ghost_thick
-    T0_arr = T0.values[thick0:-thick0 , thick0:-thick0]
-    
-    thick1 = T1.ghost_thick
-    T1_arr = T1.values[thick1:-thick1 , thick1:-thick1]
-
-    return np.mean(np.sqrt( ((T0_arr - T1_arr)/dt)**2 ))    
-
-
-def array_residual(f0:np.ndarray, thick0:int, f1:np.ndarray, thick1:int) -> np.float32:
-    
-    v0 = np.copy(f0)[thick0:-thick0 , thick0:-thick0]
-
-    v1 = np.copy(f1)[thick1:-thick1 , thick1:-thick1]
-
-    return np.mean(np.sqrt((v0 - v1)**2))
+    image = ax.imshow(array, origin='lower', cmap='viridis')
+    fig.colorbar(image, ax=ax)
+    if 'saveaspng' in kwargs.keys():
+        plt.savefig(figpath+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+    if 'pause' in kwargs.keys():
+        plt.show()
+        plt.pause(kwargs.get("pause"))
+    plt.close(fig)
 
 
 def plot_uv(uv:VelocityField, X, Y, **kwargs):
@@ -128,7 +175,7 @@ def plot_uv(uv:VelocityField, X, Y, **kwargs):
         ax1.set_title(kwargs.get('title'))
     ax1.quiver(X, Y, u, v, scale=5)
     if 'saveaspng' in kwargs.keys():
-        plt.savefig(fig_path+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+        plt.savefig(figpath+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get('pause'))
     plt.close(fig1)
@@ -147,7 +194,7 @@ def plot_strain_rate(uv:VelocityField, y, **kwargs):
     ax2.plot(1000*y, uv.strain_rate)
     ax2.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
     if 'saveaspng' in kwargs.keys():
-        plt.savefig(fig_path+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
+        plt.savefig(figpath+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get('pause'))
     plt.close(fig2)
@@ -177,7 +224,7 @@ def plot_diffusive_zone(n2:Dinitrogen, y, frame:int, dt, time, **kwargs) -> floa
     image = ax1.imshow(diffusive_zone, origin='lower', cmap='viridis')
     fig1.colorbar(image, ax=ax1)
 
-    plt.savefig(fig_path+"\\"+str(frame)+"_diff_zone.png", dpi=108, bbox_inches="tight")
+    plt.savefig(figpath+"\\"+str(frame)+"_diff_zone.png", dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get("pause"))
     plt.close(fig1)
@@ -224,12 +271,37 @@ def plot_diffusive_zone(n2:Dinitrogen, y, frame:int, dt, time, **kwargs) -> floa
     ax2.xaxis.set_major_formatter(FormatStrFormatter('%.2f'))
     ax2.set_title("$Y_{N_2}$ on the left wall"+ f" k={frame} ($\Delta t=${dt}, N={n2.N}) \n Time: {time:.6f} s")
     plt.legend(loc="upper left", bbox_to_anchor=(1.05, 1.))
-    plt.savefig(fig_path+"\\"+str(frame)+"_N2_left_wall.png", dpi=108, bbox_inches="tight")
+    plt.savefig(figpath+"\\"+str(frame)+"_N2_left_wall.png", dpi=108, bbox_inches="tight")
     if 'pause' in kwargs.keys():
         plt.pause(kwargs.get('pause'))
     plt.close(fig2)
 
     plt.close()
+
+
+
+### REGISTER DATA ###
+
+def register_array_csv(filename:str, arr:np.ndarray):
+
+    np.savetxt(datapath+"\\"+filename, arr, delimiter="\t", fmt="%.3e")
+
+
+#TO DO : have the simulation register only HDF5 .h5 files and then another make_plots.py would read these files and make animations/plots.
+def register_frame_hdf5(uv:VelocityField, press:PressureField, o2:Dioxygen, n2:Dinitrogen, ch4:Methane, h2o:Water, co2:CarbonDioxide, temp:TemperatureField, filename:str):
+
+    with h5py.File(datapath+"\\"+filename, 'w') as hdf:
+        hdf.create_dataset('uv_u_values',   matrix=uv.u.values)
+        hdf.create_dataset('uv_v_values',   matrix=uv.v.values)
+        hdf.create_dataset('press_values',  matrix=press.values)
+        hdf.create_dataset('o2_values',     matrix=o2.values)
+        hdf.create_dataset('n2_values',     matrix=n2.values)
+        hdf.create_dataset('ch4_values',    matrix=press.values)
+        hdf.create_dataset('h2o_values',    matrix=press.values)
+        hdf.create_dataset('co2_values',    matrix=press.values)
+        hdf.create_dataset('temp_values',   matrix=temp.values)     
+
+
 
 
 def print_write_end_message(code, div_crit, max_t_comput, uv_conv_crit, temp_conv_crit, L, D, N, dt, duration_delta, time, frame, uv_consecutive_diff, temp_cons_diff, max_strain_rate, diff_zone_thick, maxT):
@@ -261,100 +333,46 @@ def print_write_end_message(code, div_crit, max_t_comput, uv_conv_crit, temp_con
 
     print(message)
 
-    endfile = open(data_path+"\\simulation_report.txt", "w")
+    endfile = open(datapath+"\\simulation_report.txt", "w")
     endfile.write(message)
 
 
-def plot_chemistry(suivi_time, suivi_o2, suivi_ch4, suivi_h2o, suivi_co2, suivi_T, i, j, frame):
 
-    fig1, ax1 = plt.subplots()
-    ax1.clear()
-    ax1.set_xlabel('Time (s)')
-    ax1.set_ylabel('Massic fraction')
-    ax1.plot(suivi_time, suivi_o2, label="O2", linestyle="-", marker=".")
-    ax1.plot(suivi_time, suivi_ch4, label="CH4", linestyle="-", marker=".")
-    ax1.plot(suivi_time, suivi_h2o, label="H2O", linestyle="-", marker=".")
-    ax1.plot(suivi_time, suivi_co2, label="CO2", linestyle="-", marker=".")
-    plt.legend()
-    savename1 = f"{frame}_i{i}j{j}_species.png"
-    plt.savefig(fig_path+"\\"+savename1, dpi=108, bbox_inches="tight")
-    plt.close(fig1)
+### ARRAY DERIVATIVES ###
 
-    fig2 = plt.figure()
-    plt.plot(suivi_time, suivi_T, linestyle="-", marker=".")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Temperature (K)")
-    savename2 = f"{frame}_i{i}j{j}_temperature.png"
-    plt.savefig(fig_path+"\\"+savename2, dpi=108, bbox_inches="tight")
-    plt.close(fig2)
-
-    fig3, ax3 = plt.subplots()
-    ax3.clear()
-    ax3.set_xlabel('Time (s)')
-    ax3.set_ylabel('Absolute massic fraction derivative (/s)')
-    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_o2, suivi_time))  , label="dO2/dt",   linestyle="-", marker=".")
-    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_ch4, suivi_time)) , label="dCH4/dt",  linestyle="-", marker=".")
-    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_h2o, suivi_time)) , label="dH2O/dt",  linestyle="-", marker=".")
-    ax3.semilogy(suivi_time, np.abs(np.gradient(suivi_co2, suivi_time)) , label="dCO2/dt",  linestyle="-", marker=".")
-    plt.legend()
-    savename3 = f"{frame}_i{i}j{j}_species_deriv.png"
-    plt.savefig(fig_path+"\\"+savename3, dpi=108, bbox_inches="tight")
-    plt.close(fig3)
-
-    fig4 = plt.figure()
-    plt.semilogy(suivi_time, np.abs(np.gradient(suivi_T, suivi_time)), linestyle="-", marker=".")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Absolute temperature derivative (K/s)")
-    savename4 = f"{frame}_i{i}j{j}_temperature_deriv.png"
-    plt.savefig(fig_path+"\\"+savename4, dpi=108, bbox_inches="tight")
-    plt.close(fig2)
-
-
-def plot_consecutive_deriv(analysis_array:np.ndarray, **kwargs):
-
-    fig, ax1 = plt.subplots(layout="constrained")
-
-    frame_arr = analysis_array[0,:]
-    data_arr = analysis_array[2,:]
-
-    ax1.semilogy(frame_arr, data_arr)
-    ax1.set_xlabel("Frame index")
-    ax1.set_ylabel("Consecutive Velocity difference")
-    if 'title' in kwargs.keys():
-        ax1.set_title(kwargs.get('title'))
-
-    if 'saveaspng' in kwargs.keys():
-        plt.savefig(fig_path+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
-    if 'pause' in kwargs.keys():
-        plt.pause(kwargs.get('pause'))
-    plt.close(fig)
-
-
-def plot_array(array, **kwargs):
-
-    """
-    Plot the state of the scalar field.
-    Specifies in the title the time and the metric
-    """
-
-    # Create a figure and axis for the animation
-    fig, ax = plt.subplots()
+def velocity_derivative_norm(uv0:VelocityField, uv1:VelocityField, dt:float) -> np.float32:
+    thick0 = uv0.ghost_thick
+    u0 = uv0.u.values[thick0:-thick0 , thick0:-thick0]
+    v0 = uv0.v.values[thick0:-thick0 , thick0:-thick0]
     
-    # Plot the scalar field
-    ax.clear()
-    ax.set_xlabel('Column index')
-    ax.set_ylabel('Row index')
-    if 'title' in kwargs.keys():
-        ax.set_title(kwargs.get('title'))
+    thick1 = uv1.ghost_thick
+    u1 = uv1.u.values[thick1:-thick1 , thick1:-thick1]
+    v1 = uv1.v.values[thick1:-thick1 , thick1:-thick1]
 
-    image = ax.imshow(array, origin='lower', cmap='viridis')
-    fig.colorbar(image, ax=ax)
-    if 'saveaspng' in kwargs.keys():
-        plt.savefig(fig_path+"\\"+kwargs.get('saveaspng'), dpi=108, bbox_inches="tight")
-    if 'pause' in kwargs.keys():
-        plt.show()
-        plt.pause(kwargs.get("pause"))
-    plt.close(fig)
+    return np.mean(np.sqrt( ((u0 - u1)/dt)**2 + ((v0 - v1)/dt)**2))
+
+
+def temperature_derivative(T0:TemperatureField, T1:TemperatureField, dt:float) -> np.float32:
+    thick0 = T0.ghost_thick
+    T0_arr = T0.values[thick0:-thick0 , thick0:-thick0]
+    
+    thick1 = T1.ghost_thick
+    T1_arr = T1.values[thick1:-thick1 , thick1:-thick1]
+
+    return np.mean(np.sqrt( ((T0_arr - T1_arr)/dt)**2 ))    
+
+
+def array_residual(f0:np.ndarray, thick0:int, f1:np.ndarray, thick1:int) -> np.float32:
+    
+    v0 = np.copy(f0)[thick0:-thick0 , thick0:-thick0]
+
+    v1 = np.copy(f1)[thick1:-thick1 , thick1:-thick1]
+
+    return np.mean(np.sqrt((v0 - v1)**2))
+
+
+def two_arrays_derivative(arr0:np.ndarray, arr1:np.ndarray, dt:float) -> np.float32:
+    pass
 
 
 def worth_continue_chemistry(o2_0:np.ndarray, o2_1:np.ndarray, T_0:np.ndarray, T_1:np.ndarray, thick:int, dt:float):
@@ -370,11 +388,24 @@ def worth_continue_chemistry(o2_0:np.ndarray, o2_1:np.ndarray, T_0:np.ndarray, T
     return (max_derive_o2 > 50. or max_deriv_T > 5e5)
 
 
-def two_arrays_derivative(arr0:np.ndarray, arr1:np.ndarray, dt:float) -> np.float32:
-    pass
+
+### MISC ###
+
+def uv_copy(uv:VelocityField) -> VelocityField:
+    N = uv.N
+    new = VelocityField(np.zeros((N, N), dtype=np.float32), np.zeros((N, N), dtype=np.float32), uv.dx, uv.L_slot, uv.L_slot, uv.got_ghost_cells, uv.ghost_thick)
+    new.v.values = np.copy(uv.v.values)
+    new.u.values = np.copy(uv.u.values)
+    new.update_metric()
+
+    return new
 
 
-def register_array_csv(filename:str, arr:np.ndarray):
+def temp_copy(Temp:TemperatureField) -> TemperatureField:
 
-    np.savetxt(data_path+"\\"+filename, arr, delimiter="\t", fmt="%.3e")
+    new = TemperatureField(np.copy(Temp.values), Temp.dx, Temp.got_ghost_cells, Temp.ghost_thick)
+
+    return new    
+
+
 

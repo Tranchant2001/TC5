@@ -68,24 +68,7 @@ class CounterFlowCombustion():
         self.frame = 0 
         self.chem_frame = 0     
 
-
-    def set_dtchem_list(self, dt):
         
-        identified_stable_dt = 2e-8 # in seconds
-        nsteps = int(dt/identified_stable_dt)
-        l4 = np.full(nsteps, identified_stable_dt, dtype=float)
-
-        #fig1 = plt.figure()
-        #plt.plot(l6, label="Time piled up")
-        #plt.plot(l5, label="$\Delta t$")
-        #plt.xlabel("Index")
-        #plt.ylabel("Time s")
-        #plt.legend()
-        #plt.show()
-
-        return l4
-        
-
     def get_beta(self, uvet:VelocityField):
 
         ##f function using 2nd-order Forward Difference 2nd order standard Laplacian.
@@ -317,80 +300,6 @@ class CounterFlowCombustion():
         temp_field.values = T0 + self.dt*self._f_temperature(u_arr, v_arr, temp_field.values)
         temp_field.fillGhosts()
 
-
-    def _converge_all_species(self, o2:Dioxygen, n2:Dinitrogen, ch4:Methane, h2o:Water, co2:CarbonDioxide, T_field:TemperatureField, dtchem:float): #, conv_crit_chem):
-
-        rho = self.rho
-        c_p = self.c_p
-        #thick = self.ghost_thick
-
-        #all_converg = np.full(5, 1.)
-        #while np.sum(np.where(all_converg > conv_crit_chem, False, True)) < 5:
-        o20 = np.copy(o2.values)
-        ch40 = np.copy(ch4.values)
-        T0 = np.copy(T_field.values)
-
-        ## First step of RK2
-        QoverA = self.progress_rate(o2, ch4, T_field)
-        #misc.register_array_csv(f"{self.frame}_{self.chem_frame:02d}_step1_QoverA.csv", QoverA)
-        #misc.plot_array(QoverA, title=f"Reaction rate at the beginning of k={self.frame}", saveaspng=f"{self.frame}_{self.chem_frame:02d}_step1_QoverA.png")
-        A = 1.1e8
-        o2.values = o20 + (0.5*dtchem*o2.stoech*o2.W*A/rho)*QoverA
-        ch4.values = ch40 + (0.5*dtchem*ch4.stoech*ch4.W*A/rho)*QoverA
-        T_field.values = T0 - (0.5*dtchem*A/(rho*c_p))*(ch4.stoech*ch4.Dhf + co2.stoech*co2.Dhf + h2o.stoech*h2o.Dhf)*QoverA
-        #sys.exit()
-
-        ## Second step of RK2
-        QoverA = self.progress_rate(o2, ch4, T_field)
-        #misc.register_array_csv(f"{self.frame}_{self.chem_frame:02d}_step2_QoverA.csv", QoverA)
-        #misc.plot_array(QoverA, title=f"Reaction rate at the 2nd step of k={self.frame}", saveaspng=f"{self.frame}_{self.chem_frame:02d}_step2_QoverA.png")
-        o2.values = o20 + (dtchem*o2.stoech*o2.W*A/rho)*QoverA
-        #n2.values = n2.values + (dtchem*n2.stoech*n2.W*A/rho)*QoverA
-        ch4.values = ch40 + (dtchem*ch4.stoech*ch4.W*A/rho)*QoverA
-        h2o.values = h2o.values + (dtchem*h2o.stoech*h2o.W*A/rho)*QoverA
-        co2.values = co2.values + (dtchem*co2.stoech*co2.W*A/rho)*QoverA
-        T_field.values = T0 - (dtchem*A/(rho*c_p))*(ch4.stoech*ch4.Dhf + co2.stoech*co2.Dhf + h2o.stoech*h2o.Dhf)*QoverA
-        #sys.exit()
-
-        #omega_T = -(o2.Dhf*o2.stoech + n2.Dhf*n2.stoech + ch4.Dhf*ch4.stoech + h2o.Dhf*h2o.stoech + co2.Dhf*co2.stoech)*Q
-        #T_field.values = T_field.values + (dtchem/(rho*c_p))*omega_T
-
-
-    def progress_rate(self, o2:Dioxygen, ch4:Methane, T_field:TemperatureField):
-        
-        N = self.N
-        rho = self.rho
-        thick = self.ghost_thick
-        Ta = self.Ta
-
-        ch4_conc = (rho/ch4.W)*ch4.values[thick:-thick, thick:-thick]
-        o2_conc = (rho/o2.W)*o2.values[thick:-thick, thick:-thick]
-
-        #ch4_max = np.max(ch4_conc)
-        ch4_investigate = np.argwhere(np.isnan(ch4_conc))
-        #misc.plot_array(ch4_conc, title="CH4_conccentration", pause=3)
-        #misc.register_array_csv(f"{self.frame}_{self.chem_frame:02d}_ch4_conc.csv", ch4_conc)
-        #o2_max = np.max(o2_conc)
-        o2_investigate = np.argwhere(np.isnan(o2_conc))
-        #misc.plot_array(o2_conc, title="CH4_conccentration", pause=3)
-        #misc.register_array_csv(f"{self.frame}_{self.chem_frame:02d}_o2_conc.csv", o2_conc)
-
-        T_arr = T_field.values[thick:-thick, thick:-thick]
-        exp_array = np.where(T_arr >= 100, np.exp(-Ta/T_arr), 0.) # Caution to counter from RuntimeWarning: overflow encountered in exp
-        #misc.register_array_csv(f"{self.frame}_{self.chem_frame:02d}_exp_array.csv", exp_array)
-
-        #exp_max = np.max(exp_array)
-        exp_investigate = np.argwhere(np.isnan(exp_array))
-        #misc.plot_array(exp_array, title="Exp array", pause=3)
-
-        QoverA = np.zeros((N,N), dtype=float)
-        QoverA[thick:-thick, thick:-thick] = np.multiply(o2_conc, o2_conc)*ch4_conc*exp_array
-        
-        #q_max = np.max(QoverA)
-        q_investigate = np.argwhere(np.isnan(QoverA))
-
-        return QoverA
-    
 
     def compute(self):
         

@@ -29,9 +29,9 @@ fullpath = os.path.abspath(__file__)
 #Chemin absolu du dossier contenant le .py qu'on execute
 projectpath = os.path.dirname(fullpath)
 # Chemin des data
-data_path = projectpath + "\\outputs\\Data"
+datapath = projectpath + "\\outputs\\Data"
 # Chemin des figures
-fig_path = projectpath + "\\outputs\\Figures"
+figpath = projectpath + "\\outputs\\Figures"
 
 
 
@@ -77,7 +77,6 @@ if show_and_save:
     
     if suppressed_things:
         print("Warning: any file located in "+datapath+" was removed.")
-
 
     
 

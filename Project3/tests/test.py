@@ -55,3 +55,22 @@ print(projectpath)
 print(type(fullpath))
 print(type(dirpath))
 print(type(projectpath))
+
+def testing_docstring(input1:int, input2:float, input3:int)->float:
+    """_summary_
+
+    Args:
+        input1 (int): _description_
+        input2 (float): _description_
+        input3 (int): _description_
+
+    Returns:
+        float: _description_
+    """
+    q = input1 // input3
+    r = input1 % input3
+
+    return q*input2 + r
+
+
+
