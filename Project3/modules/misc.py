@@ -288,25 +288,30 @@ def register_array_csv(filename:str, arr:np.ndarray):
 
 
 #TO DO : have the simulation register only HDF5 .h5 files and then another make_plots.py would read these files and make animations/plots.
-def register_frame_hdf5(uv:VelocityField, press:PressureField, o2:Dioxygen, n2:Dinitrogen, ch4:Methane, h2o:Water, co2:CarbonDioxide, temp:TemperatureField, filename:str):
+def register_frame_hdf5(uv:VelocityField, press:PressureField, o2:Dioxygen, n2:Dinitrogen, ch4:Methane, h2o:Water, co2:CarbonDioxide, temp:TemperatureField, frame:int, register_frame:int, filename:str):
 
     with h5py.File(datapath+"\\"+filename, 'w') as hdf:
-        hdf.create_dataset('uv_u_values',   matrix=uv.u.values)
-        hdf.create_dataset('uv_v_values',   matrix=uv.v.values)
-        hdf.create_dataset('press_values',  matrix=press.values)
-        hdf.create_dataset('o2_values',     matrix=o2.values)
-        hdf.create_dataset('n2_values',     matrix=n2.values)
-        hdf.create_dataset('ch4_values',    matrix=press.values)
-        hdf.create_dataset('h2o_values',    matrix=press.values)
-        hdf.create_dataset('co2_values',    matrix=press.values)
-        hdf.create_dataset('temp_values',   matrix=temp.values)     
+        arr_gr = hdf.create_group('Fields')
+        arr_gr.create_dataset('uv_u_values',   data=uv.u.values)
+        arr_gr.create_dataset('uv_v_values',   data=uv.v.values)
+        arr_gr.create_dataset('press_values',  data=press.values)
+        arr_gr.create_dataset('o2_values',     data=o2.values)
+        arr_gr.create_dataset('n2_values',     data=n2.values)
+        arr_gr.create_dataset('ch4_values',    data=ch4.values)
+        arr_gr.create_dataset('h2o_values',    data=h2o.values)
+        arr_gr.create_dataset('co2_values',    data=co2.values)
+        arr_gr.create_dataset('temp_values',   data=temp.values)
 
-
-
+        arr_gr.attrs['N'] = uv.N
+        arr_gr.attrs['ghost_thick'] = uv.ghost_thick
+        arr_gr.attrs['frame'] = frame
+        arr_gr.attrs['register_iter'] = register_frame
+        arr_gr.attrs['filename'] = filename
+        
 
 def print_write_end_message(code, div_crit, max_t_comput, uv_conv_crit, temp_conv_crit, L, D, N, dt, duration_delta, time, frame, uv_consecutive_diff, temp_cons_diff, max_strain_rate, diff_zone_thick, maxT):
     
-    assert(code in ["divergence", "timeout", "success_velocity", "success_temp"])
+    assert(code in ["divergence", "timeout", "success_velocity", "success_temp", "manual_interrupt"])
     
     first_line = ""
     
@@ -317,7 +322,9 @@ def print_write_end_message(code, div_crit, max_t_comput, uv_conv_crit, temp_con
     elif code == "success_velocity":
         first_line = f"Success: The simulation stopped running because the velocity field was stable enough (uv_consecutive_difference < {uv_conv_crit:.2e})."
     elif code == "success_temp":
-        first_line = f"Success: The simulation stopped running because the T° field was stable enough (temp_consecutive_difference < {temp_conv_crit:.2e})."        
+        first_line = f"Success: The simulation stopped running because the T° field was stable enough (temp_consecutive_difference < {temp_conv_crit:.2e})."
+    elif code == "manual_interrupt":
+        first_line = f"Warning: The simulation stopped running because the user manually interrupted the program."
 
     parameters =   f"\tParameters: (L, D, N, $\Delta t$)=({L}, {D}, {N}, {dt})"
     simu_duration = "\tSimulation duration: "+str(duration_delta)
@@ -331,10 +338,10 @@ def print_write_end_message(code, div_crit, max_t_comput, uv_conv_crit, temp_con
 
     message = first_line + "\n" + parameters + "\n" + simu_duration + "\n" + vtime + "\n" + vframe + "\n" + uv_difference + "\n" + temp_diff + "\n" + max_srate+ "\n" + diff_zone + "\n" + flame_Temp + "\n"
 
-    print(message)
+    print("\n"+message)
 
-    endfile = open(datapath+"\\simulation_report.txt", "w")
-    endfile.write(message)
+    with open(datapath+"\\simulation_report.txt", "w") as endfile:
+        endfile.write(message)
 
 
 

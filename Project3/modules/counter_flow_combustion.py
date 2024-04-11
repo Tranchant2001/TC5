@@ -48,8 +48,11 @@ class CounterFlowCombustion():
         max_Fo = 0.25 # Fourier threshold in 2D
         max_CFL = 0.5 # CFL limit thresholf in 2D
         self.dt = 0.4*min(max_Fo*self.dx**2/D, max_CFL*self.dx/max_u)   # Time step
-        self.dtchem_list = self.set_dtchem_list(self.dt)
         #self.dt = 4e-6
+
+        self.Temp_maxT_flame = None
+        self.uv_max_strain_rate = None
+        self.n2_diff_zone_thick = None
         
         self.omega = 2*(1 - math.pi/physN - (math.pi/physN)**2)
         #self.omega = 1.5    # omega parameter evaluation of the SOR method
@@ -66,7 +69,13 @@ class CounterFlowCombustion():
 
         # I want the variable counting the nb of frames realized to be a class attribute.
         self.frame = 0 
-        self.chem_frame = 0     
+        self.chem_frame = 0
+        self.time = 0.
+        self.start_datetime = datetime.datetime.now()
+        self.stop_datetime = datetime.datetime.now()
+
+        # End interrupt key code. Initialized at "manual interrupt" because for a success or divergence end, the code is changed.
+        self.endcode = "manual_interrupt"   
 
         
     def get_beta(self, uvet:VelocityField):
@@ -320,7 +329,7 @@ class CounterFlowCombustion():
 
         # Initalize uvcopy
         uvcopy = VelocityField(np.zeros((physN, physN), dtype=float), np.zeros((physN, physN), dtype=float) , dx, L_slot, L_coflow, False, thick)
-        uv_consecutive_diff = 1000.
+        self.uv_consecutive_diff = 1000.
 
         # Initializing the V* field
         uvet = VelocityField(np.zeros((physN, physN), dtype=float), np.zeros((physN, physN), dtype=float) , dx, L_slot, L_coflow, False, thick)
@@ -341,32 +350,33 @@ class CounterFlowCombustion():
         
         # Initalize TempCopy
         TempCopy = TemperatureField(np.full((physN, physN), 300), dx, False, thick)
-        temp_consecutive_diff = 1000.
+        self.temp_consecutive_diff = 1000.
         
         # Set time to zero
-        time = 0.
+        self.time = 0.
         
-        start_datetime = datetime.datetime.now()
-        stop_datetime = datetime.datetime.now()
+        self.start_datetime = datetime.datetime.now()
+        self.stop_datetime = datetime.datetime.now()
 
         # Settings
         hasIgnitionStarted = False
+        already_saved_X_times = 0
 
-        while uv_consecutive_diff >= self.uv_conv_crit and temp_consecutive_diff >= self.temp_conv_crit and uv.metric < self.div_crit and stop_datetime - start_datetime < self.max_t_comput:
+        while self.uv_consecutive_diff >= self.uv_conv_crit and self.temp_consecutive_diff >= self.temp_conv_crit and uv.metric < self.div_crit and self.stop_datetime - self.start_datetime < self.max_t_comput:
             
-            time = self.frame * dt
+            self.time = self.frame * dt
 
             isDisplayFrame = (self.frame%frame_period == 0)
 
             if isDisplayFrame:
                 
                 if self.frame != 0:
-                    uv_consecutive_diff = misc.velocity_derivative_norm(uvcopy, uv, dt)
+                    self.uv_consecutive_diff = misc.velocity_derivative_norm(uvcopy, uv, dt)
                     if hasIgnitionStarted:
-                        temp_consecutive_diff = misc.temperature_derivative(TempCopy, Temp, dt)
+                        self.temp_consecutive_diff = misc.temperature_derivative(TempCopy, Temp, dt)
 
-                print(f"Frame=\t{self.frame:06}\t ; \tVirtual time={time:.2e} s\t;\tLast SOR nb iter={Press.last_nb_iter}\t;\tVelocity Cons. Diff.={uv_consecutive_diff:.2e}\t;\tT° Cons. Diff.={temp_consecutive_diff:.2e}")
-                stop_datetime = datetime.datetime.now()
+                print(f"Frame=\t{self.frame:06}\t ; \tVirtual time={self.time:.2e} s\t;\tLast SOR nb iter={Press.last_nb_iter}\t;\tVelocity Cons. Diff.={self.uv_consecutive_diff:.2e}\t;\tT° Cons. Diff.={self.temp_consecutive_diff:.2e}")
+                self.stop_datetime = datetime.datetime.now()
 
                 if self.show_save:
                     #misc.register_array_csv(f"{self.frame}_ch4.csv", ch4.values)
@@ -376,13 +386,16 @@ class CounterFlowCombustion():
                     #misc.plot_field(uvet.u, True, title=f'U* Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_u-et_field.png")
                     #misc.plot_strain_rate(uv, self.y, title="Spatial representation of th strain rate along the slipping wall", saveaspng=str(self.frame)+"_strain_rate.png")
                     #misc.plot_field(Press, True, title=f'Pressure Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_press_field.png")
-                    misc.plot_field(o2, False, vmin=0.0, vmax=1.01, title=f'O2 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_O2.png")
+                    #misc.plot_field(o2, False, vmin=0.0, vmax=1.01, title=f'O2 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_O2.png")
                     #misc.plot_field(n2, False, vmin=0.0, vmax=1.01, title=f'N2 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_N2.png")
-                    misc.plot_field(ch4, False, vmin=0.0, vmax=1.01, title=f'CH4 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_CH4.png")
-                    misc.plot_field(h2o, False, vmin=0.0, vmax=1.01, title=f'H2O Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_H2O.png")
-                    misc.plot_field(co2, False, vmin=0.0, vmax=1.01, title=f'CO2 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_CO2.png")
-                    misc.plot_field(Temp, False, title=f'T° Field k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s',saveaspng=str(self.frame)+"_temp_field.png")
+                    #misc.plot_field(ch4, False, vmin=0.0, vmax=1.01, title=f'CH4 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_CH4.png")
+                    #misc.plot_field(h2o, False, vmin=0.0, vmax=1.01, title=f'H2O Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_H2O.png")
+                    #misc.plot_field(co2, False, vmin=0.0, vmax=1.01, title=f'CO2 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_CO2.png")
+                    #misc.plot_field(Temp, False, title=f'T° Field k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s',saveaspng=str(self.frame)+"_temp_field.png")
                     #misc.plot_diffusive_zone(n2, self.y, self.frame, dt, time)
+                    self.n2_diff_zone_thick = n2.diff_zone_thick 
+                    misc.register_frame_hdf5(uv, Press, o2, n2, ch4, h2o, co2, Temp, self.frame, already_saved_X_times, f"{already_saved_X_times}_all_fields.h5")
+                    already_saved_X_times += 1
 
             elif self.frame%frame_period == frame_period-1 :
                 uvcopy = misc.uv_copy(uv)
@@ -390,7 +403,7 @@ class CounterFlowCombustion():
                     TempCopy = misc.temp_copy(Temp)
 
        
-            if time >= self.time_ignite:
+            if self.time >= self.time_ignite:
                 # This function ignites the middle of the box to 1000 K or more.
                 Temp.ignite_or_not()
 
@@ -409,9 +422,9 @@ class CounterFlowCombustion():
             #    misc.plot_field(ch4, False, title=f'CH4 Population just before chemistry k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_CH4_beforeChem.png")
 
 
-            if time >= self.time_ignite:
+            if self.time >= self.time_ignite:
                 if not hasIgnitionStarted:
-                    print(f"\tIgnition started at {time:.3e} s\t, frame {self.frame}.")
+                    print(f"\tIgnition started at {self.time:.3e} s\t, frame {self.frame}.")
                     frame_igni = self.frame
                     chemistry_solver.chemistry_loop(o2, ch4, h2o, co2, Temp, self.L, self.frame, dt, rho, self.c_p, self.Ta, self.i_reactor, self.j_reactor, True)
                     hasIgnitionStarted = True
@@ -452,35 +465,39 @@ class CounterFlowCombustion():
             #misc.plot_field(uvet.u, True, title=f'U* Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_u-et2_field.png")            
             uv._fillGhosts()
             uv.update_metric()
+            self.uv_max_strain_rate = uv.max_strain_rate
             
             self.frame += 1
 
         # Determines the maximum
         Temp.maxT_flame = np.max(Temp.values[thick:-thick , thick:-thick])
+        self.Temp_maxT_flame = Temp.maxT_flame
 
         # Plots of the final frame
         #misc.plot_field(uv.v, True, title=f'V Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s \n Metric: {uv.metric:.5f}',saveaspng=str(self.frame)+"_v_field.png")
         #misc.plot_field(uv.u, True, title=f'U Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s \n Metric: {uv.metric:.5f}',saveaspng=str(self.frame)+"_u_field.png")
         #misc.plot_strain_rate(uv, self.y, title=f"Spatial representation of th strain rate along the slipping wall\nMax is {uv.max_strain_rate:.4e} Hz", saveaspng=str(self.frame)+"_strain_rate.png")
         #misc.plot_field(Press, True, title=f'Pressure Field k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s',saveaspng=str(self.frame)+"_press_field.png")
-        misc.plot_field(o2, False, vmin=0.0, vmax=1.01, title=f'O2 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_O2.png")
+        misc.plot_field(o2, False, vmin=0.0, vmax=1.01, title=f'O2 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {self.time:.3e} s', saveaspng=str(self.frame)+"_O2.png")
         #misc.plot_field(n2, True, title=f'N2 Population k={self.frame} ($\Delta t=${dt}, N={N}) \n Time: {time:.6f} s', saveaspng=str(self.frame)+"_N2.png")        
-        misc.plot_field(ch4, False, vmin=0.0, vmax=1.01, title=f'CH4 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_CH4.png")
-        misc.plot_field(h2o, False, vmin=0.0, vmax=1.01, title=f'H2O Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_H2O.png")
-        misc.plot_field(co2, False, vmin=0.0, vmax=1.01, title=f'CO2 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s', saveaspng=str(self.frame)+"_CO2.png")
-        misc.plot_field(Temp, False, title=f'T° Field k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {time:.3e} s',saveaspng=str(self.frame)+"_temp_field.png")
+        misc.plot_field(ch4, False, vmin=0.0, vmax=1.01, title=f'CH4 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {self.time:.3e} s', saveaspng=str(self.frame)+"_CH4.png")
+        misc.plot_field(h2o, False, vmin=0.0, vmax=1.01, title=f'H2O Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {self.time:.3e} s', saveaspng=str(self.frame)+"_H2O.png")
+        misc.plot_field(co2, False, vmin=0.0, vmax=1.01, title=f'CO2 Population k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {self.time:.3e} s', saveaspng=str(self.frame)+"_CO2.png")
+        misc.plot_field(Temp, False, title=f'T° Field k={self.frame} ($\Delta t=${dt:.3e}, N={N}) \n Time: {self.time:.3e} s',saveaspng=str(self.frame)+"_temp_field.png")
 
         #misc.plot_diffusive_zone(n2, self.y, self.frame, dt, time)
 
         # About to print and write in final file the report of the simulation.
         if uv.metric >= self.div_crit :
-            code = "divergence"        
-        elif stop_datetime - start_datetime >= self.max_t_comput:
-            code = "timeout"
-        elif uv_consecutive_diff < self.uv_conv_crit:
-            code = "success_velocity"
-        else:
-            code = "success_temp"
+            self.endcode = "divergence"        
+        elif self.stop_datetime - self.start_datetime >= self.max_t_comput:
+            self.endcode = "timeout"
+        elif self.uv_consecutive_diff < self.uv_conv_crit:
+            self.endcode = "success_velocity"
+        elif self.temp_consecutive_diff < self.temp_conv_crit:
+            self.endcode = "success_temp"
 
-        misc.print_write_end_message(code, self.div_crit, self.max_t_comput, self.uv_conv_crit, self.temp_conv_crit, self.L, self.D, N, dt, stop_datetime-start_datetime, time, self.frame, uv_consecutive_diff, temp_consecutive_diff, uv.max_strain_rate, n2.diff_zone_thick, Temp.maxT_flame)
+
+    def end_message(self):
+        misc.print_write_end_message(self.endcode, self.div_crit, self.max_t_comput, self.uv_conv_crit, self.temp_conv_crit, self.L, self.D, self.N, self.dt, self.stop_datetime - self.start_datetime, self.time, self.frame, self.uv_consecutive_diff, self.temp_consecutive_diff, self.uv_max_strain_rate, self.n2_diff_zone_thick, self.Temp_maxT_flame)
 

@@ -19,8 +19,10 @@ Propagating the Fluid flow in the chamber.
 import datetime
 import os
 import glob
+import atexit
 
 from modules.counter_flow_combustion import CounterFlowCombustion
+from modules.misc import print_write_end_message
 
 
 
@@ -64,7 +66,11 @@ register_period = 781 # Period in frames of registeration of plots.
 i_reactor = physN//2 # Here its in the middle of the left wall.
 j_reactor = 0
 
-if show_and_save:
+
+### FUNCTIONS ###
+
+def delete_existing_datapath():
+
     data_files = glob.glob(datapath+"\\*")
     suppressed_things = False
     for f in data_files:
@@ -78,7 +84,20 @@ if show_and_save:
     if suppressed_things:
         print("Warning: any file located in "+datapath+" was removed.")
 
+
+def end_message(asimu:CounterFlowCombustion):
+
+    print_write_end_message(asimu.endcode, asimu.div_crit, asimu.max_t_comput, asimu.uv_conv_crit, asimu.temp_conv_crit, asimu.L, asimu.D, asimu.N, asimu.dt, asimu.stop_datetime - asimu.start_datetime, asimu.time, asimu.frame, asimu.uv_consecutive_diff, asimu.temp_consecutive_diff, asimu.uv_max_strain_rate, asimu.n2_diff_zone_thick, asimu.Temp_maxT_flame)
+
+
+### MAIN ###
     
+if show_and_save:
+    delete_existing_datapath()
 
 mysimu = CounterFlowCombustion(L, physN, L_slot, L_coflow, nu, D, a, rho, c_p, Temp_a, time_before_ignit, max_time_computation, show_and_save, register_period, i_reactor, j_reactor, ell_crit, div_crit, uv_conv_crit, temp_conv_crit)
+
+atexit.register(end_message, mysimu)
+
 mysimu.compute()
+
