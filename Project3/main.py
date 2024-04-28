@@ -23,6 +23,7 @@ import atexit
 
 from modules.counter_flow_combustion import CounterFlowCombustion
 from modules.misc import print_write_end_message
+from modules.simu_parameters import SimuParameters
 
 
 
@@ -61,7 +62,7 @@ max_time_computation = datetime.timedelta(hours=1, minutes=0) # Put here the max
 
 ### OTHER PARAMETERS ###
 show_and_save = True # Show and register plots ?
-register_period = 781 # Period in frames of registeration of plots.
+register_period = 5 # Period in frames of registeration of plots.
 # Coordinates of the pixel to observe to check chemistry well functioning. Enter the coordinate, not accounting for ghost cells. 
 i_reactor = physN//2 # Here its in the middle of the left wall.
 j_reactor = 0
@@ -86,18 +87,45 @@ def delete_existing_datapath():
 
 
 def end_message(asimu:CounterFlowCombustion):
+    
+    div_crit = asimu.prms.div_crit
+    uv_conv_crit = asimu.prms.uv_conv_crit
+    temp_conv_crit = asimu.prms.temp_conv_crit
+    L = asimu.prms.L
+    D = asimu.prms.D
+    N = asimu.prms.N
+    dt = asimu.prms.dt
+    max_t_comput = asimu.prms.max_t_comput    
 
-    print_write_end_message(asimu.endcode, asimu.div_crit, asimu.max_t_comput, asimu.uv_conv_crit, asimu.temp_conv_crit, asimu.L, asimu.D, asimu.N, asimu.dt, asimu.stop_datetime - asimu.start_datetime, asimu.time, asimu.frame, asimu.uv_consecutive_diff, asimu.temp_consecutive_diff, asimu.uv_max_strain_rate, asimu.n2_diff_zone_thick, asimu.Temp_maxT_flame)
+    stop_datetime = asimu.stop_datetime
+    start_datetime = asimu.start_datetime
+    time = asimu.time
+    frame = asimu.frame
+    uv_consecutive_diff = asimu.uv_consecutive_diff
+    temp_consecutive_diff = asimu.temp_consecutive_diff
+    uv_max_strain_rate = asimu.uv_max_strain_rate
+    n2_diff_zone_thick = asimu.n2_diff_zone_thick
+    Temp_maxT_flame = asimu.Temp_maxT_flame
+    endcode = asimu.endcode
+
+
+    print_write_end_message(endcode, div_crit, max_t_comput, uv_conv_crit, temp_conv_crit, L, D, N, dt, stop_datetime - start_datetime, time, frame, uv_consecutive_diff, temp_consecutive_diff, uv_max_strain_rate, n2_diff_zone_thick, Temp_maxT_flame)
+
 
 
 ### MAIN ###
     
-if show_and_save:
-    delete_existing_datapath()
+if __name__ == "__main__":
 
-mysimu = CounterFlowCombustion(L, physN, L_slot, L_coflow, nu, D, a, rho, c_p, Temp_a, time_before_ignit, max_time_computation, show_and_save, register_period, i_reactor, j_reactor, ell_crit, div_crit, uv_conv_crit, temp_conv_crit)
+    if show_and_save:
+        delete_existing_datapath()
 
-atexit.register(end_message, mysimu)
+    myparams = SimuParameters(L, physN, L_slot, L_coflow, nu, D, a, rho, c_p, Temp_a, time_before_ignit, register_period, i_reactor, j_reactor, ell_crit, div_crit, uv_conv_crit, temp_conv_crit, max_time_computation, show_and_save, datapath)
+    myparams.save_as_pickle()
 
-mysimu.compute()
+    mysimu = CounterFlowCombustion(myparams)
+
+    atexit.register(end_message, mysimu)
+
+    mysimu.compute()
 
